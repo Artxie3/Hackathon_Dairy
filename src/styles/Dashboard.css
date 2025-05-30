@@ -1,0 +1,436 @@
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.dashboard-header {
+  margin-bottom: 1rem;
+}
+
+.dashboard-header h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-gray-900);
+  margin-bottom: 0.25rem;
+}
+
+.dark-theme .dashboard-header h1 {
+  color: var(--color-gray-100);
+}
+
+.dashboard-date {
+  color: var(--color-gray-500);
+  font-size: 0.875rem;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+
+.dashboard-card {
+  background-color: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 1.25rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dark-theme .dashboard-card {
+  background-color: var(--color-dark-card);
+}
+
+.dashboard-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.card-header h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-gray-900);
+}
+
+.dark-theme .card-header h2 {
+  color: var(--color-gray-100);
+}
+
+.view-all {
+  font-size: 0.75rem;
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.view-all:hover {
+  color: var(--color-primary-dark);
+  text-decoration: underline;
+}
+
+/* Stats Card */
+.stats-card {
+  grid-column: span 2;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+  margin-top: 1rem;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  color: white;
+  flex-shrink: 0;
+}
+
+.coding-time {
+  background-color: var(--color-primary);
+}
+
+.commits {
+  background-color: var(--color-secondary);
+}
+
+.listened {
+  background-color: var(--color-accent);
+}
+
+.mood {
+  background-color: var(--color-success);
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-info h3 {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-gray-500);
+  margin-bottom: 0.25rem;
+}
+
+.stat-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-gray-900);
+}
+
+.dark-theme .stat-value {
+  color: var(--color-gray-100);
+}
+
+/* Recent Commits */
+.recent-commits-card {
+  grid-column: span 1;
+  grid-row: span 2;
+}
+
+.commits-list {
+  list-style: none;
+}
+
+.commit-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--color-gray-200);
+}
+
+.dark-theme .commit-item {
+  border-bottom-color: var(--color-gray-700);
+}
+
+.commit-item:last-child {
+  border-bottom: none;
+}
+
+.commit-message {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-gray-900);
+  margin-bottom: 0.25rem;
+}
+
+.dark-theme .commit-message {
+  color: var(--color-gray-100);
+}
+
+.commit-repo {
+  font-size: 0.75rem;
+  color: var(--color-gray-500);
+}
+
+.commit-time {
+  font-size: 0.75rem;
+  color: var(--color-gray-400);
+  white-space: nowrap;
+  margin-left: 1rem;
+}
+
+/* Calendar Card */
+.calendar-card {
+  grid-column: span 2;
+}
+
+.calendar-heatmap {
+  margin-top: 1rem;
+}
+
+.heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.375rem;
+}
+
+.heatmap-cell {
+  aspect-ratio: 1/1;
+  background-color: var(--color-gray-200);
+  border-radius: 2px;
+  transition: transform 0.2s ease;
+}
+
+.dark-theme .heatmap-cell {
+  background-color: var(--color-gray-700);
+}
+
+.heatmap-cell:hover {
+  transform: scale(1.2);
+}
+
+.heatmap-cell.level-1 {
+  background-color: rgba(99, 102, 241, 0.2);
+}
+
+.heatmap-cell.level-2 {
+  background-color: rgba(99, 102, 241, 0.4);
+}
+
+.heatmap-cell.level-3 {
+  background-color: rgba(99, 102, 241, 0.6);
+}
+
+.heatmap-cell.level-4 {
+  background-color: rgba(99, 102, 241, 0.8);
+}
+
+/* Projects Card */
+.projects-card {
+  grid-column: span 2;
+}
+
+.projects-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.project-item {
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  background-color: var(--color-gray-100);
+  transition: background-color 0.2s ease;
+}
+
+.dark-theme .project-item {
+  background-color: var(--color-gray-800);
+}
+
+.project-item:hover {
+  background-color: var(--color-gray-200);
+}
+
+.dark-theme .project-item:hover {
+  background-color: var(--color-gray-700);
+}
+
+.project-info h3 {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-gray-900);
+  margin-bottom: 0.5rem;
+}
+
+.dark-theme .project-info h3 {
+  color: var(--color-gray-100);
+}
+
+.project-meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.project-deadline {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--color-gray-500);
+}
+
+.progress-bar {
+  height: 6px;
+  background-color: var(--color-gray-200);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 0.25rem;
+}
+
+.dark-theme .progress-bar {
+  background-color: var(--color-gray-700);
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: var(--color-primary);
+  border-radius: 3px;
+}
+
+.progress-text {
+  font-size: 0.75rem;
+  color: var(--color-gray-500);
+  text-align: right;
+  display: block;
+}
+
+/* Listening Card */
+.listening-card {
+  grid-column: span 1;
+}
+
+.listening-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.listening-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  background-color: var(--color-gray-100);
+  transition: background-color 0.2s ease;
+}
+
+.dark-theme .listening-item {
+  background-color: var(--color-gray-800);
+}
+
+.listening-item:hover {
+  background-color: var(--color-gray-200);
+}
+
+.dark-theme .listening-item:hover {
+  background-color: var(--color-gray-700);
+}
+
+.listening-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: var(--color-accent-light);
+  color: var(--color-accent-dark);
+}
+
+.listening-info h3 {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-gray-900);
+  margin-bottom: 0.25rem;
+}
+
+.dark-theme .listening-info h3 {
+  color: var(--color-gray-100);
+}
+
+.listening-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.listening-platform,
+.listening-duration {
+  font-size: 0.75rem;
+  color: var(--color-gray-500);
+}
+
+.listening-platform {
+  padding: 0.125rem 0.375rem;
+  background-color: var(--color-gray-200);
+  border-radius: 0.25rem;
+}
+
+.dark-theme .listening-platform {
+  background-color: var(--color-gray-700);
+}
+
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .stats-card,
+  .calendar-card,
+  .projects-card {
+    grid-column: span 2;
+  }
+  
+  .recent-commits-card,
+  .listening-card {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .stats-card,
+  .recent-commits-card,
+  .calendar-card,
+  .projects-card,
+  .listening-card {
+    grid-column: span 1;
+  }
+  
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}

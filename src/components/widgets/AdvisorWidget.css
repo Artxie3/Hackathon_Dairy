@@ -1,0 +1,119 @@
+.advisor-widget {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 300px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: all 0.3s ease;
+  z-index: 100;
+  transform: translateY(0);
+  max-height: 400px;
+}
+
+.dark-theme .advisor-widget {
+  background-color: var(--color-dark-card);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.advisor-widget.expanded {
+  width: 350px;
+}
+
+.advisor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background-color: var(--color-primary);
+  color: white;
+}
+
+.advisor-type {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.advisor-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.advisor-btn {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 4px;
+  font-size: 0.75rem;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.advisor-btn:hover {
+  opacity: 1;
+}
+
+.advisor-btn.close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.advisor-content {
+  padding: 16px;
+  font-size: 0.875rem;
+  color: var(--color-gray-700);
+}
+
+.dark-theme .advisor-content {
+  color: var(--color-gray-300);
+}
+
+.advisor-action-btn {
+  margin-top: 12px;
+  padding: 6px 12px;
+  background-color: var(--color-primary-light);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition: background-color 0.2s ease;
+}
+
+.advisor-action-btn:hover {
+  background-color: var(--color-primary);
+}
+
+.advisor-widget.break .advisor-header {
+  background-color: var(--color-secondary);
+}
+
+.advisor-widget.deadline .advisor-header {
+  background-color: var(--color-warning);
+}
+
+.advisor-widget.achievement .advisor-header {
+  background-color: var(--color-success);
+}
+
+.advisor-widget.tip .advisor-header {
+  background-color: var(--color-accent);
+}
+
+@media (max-width: 768px) {
+  .advisor-widget {
+    width: calc(100% - 40px);
+    bottom: 70px;
+  }
+  
+  .advisor-widget.expanded {
+    width: calc(100% - 40px);
+  }
+}
