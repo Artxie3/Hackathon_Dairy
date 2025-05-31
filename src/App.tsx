@@ -14,7 +14,6 @@ import Login from './pages/Login';
 import Profile from './pages/Profile';
 import NotFound from './pages/NotFound';
 import AuthCallback from './pages/AuthCallback';
-import AuthCallbackSuccess from './pages/AuthCallbackSuccess';
 import './App.css';
 
 function App() {
@@ -26,7 +25,6 @@ function App() {
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
-              <Route path="/auth/callback/success" element={<AuthCallbackSuccess />} />
               <Route element={<ProtectedRoute />}>
                 <Route element={<Layout />}>
                   <Route index element={<Dashboard />} />
