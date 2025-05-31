@@ -9,6 +9,40 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Initialize storage bucket for voice notes
+export async function initializeStorage() {
+  try {
+    // Check if bucket exists
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const voiceNotesBucket = buckets?.find(bucket => bucket.name === 'voice-notes');
+
+    if (!voiceNotesBucket) {
+      // Create the bucket if it doesn't exist
+      const { data, error } = await supabase.storage.createBucket('voice-notes', {
+        public: true, // Allow public access to files
+        fileSizeLimit: 52428800, // 50MB limit
+        allowedMimeTypes: ['audio/webm', 'audio/mp3', 'audio/wav', 'audio/mpeg']
+      });
+
+      if (error) {
+        console.error('Error creating voice-notes bucket:', error);
+        throw error;
+      }
+
+      // Set up bucket policy to allow public access
+      const { error: policyError } = await supabase.storage.from('voice-notes').createSignedUrl('dummy.txt', 3600);
+      if (policyError && !policyError.message.includes('does not exist')) {
+        console.error('Error setting bucket policy:', policyError);
+      }
+    }
+  } catch (err) {
+    console.error('Error initializing storage:', err);
+  }
+}
+
+// Call initializeStorage when the app starts
+initializeStorage();
+
 // Types for our database tables
 export interface DiaryEntry {
   id: string;
