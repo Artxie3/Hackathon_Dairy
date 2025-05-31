@@ -6,8 +6,9 @@ interface GitHubUser {
   email: string;
 }
 
+const BASE_URL = 'https://hackathon-dairy.vercel.app';
 export const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID;
-export const GITHUB_REDIRECT_URI = 'https://hackathon-dairy.vercel.app/api/auth/callback';
+export const GITHUB_REDIRECT_URI = `${BASE_URL}/api/auth/callback`;
 
 export function getGitHubAuthUrl(): string {
   const params = new URLSearchParams({
