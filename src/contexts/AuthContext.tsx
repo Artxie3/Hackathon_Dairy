@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { getGitHubAuthUrl, exchangeCodeForToken, fetchGitHubUser } from '../utils/auth';
 
 interface User {
   id: number;
@@ -29,7 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const searchParams = new URLSearchParams(window.location.search);
     const code = searchParams.get('code');
     
-    if (code) {
+    if (code && window.location.pathname === '/auth/callback') {
       handleAuthCallback(code);
     } else {
       // Check for existing session
@@ -44,33 +43,84 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleAuthCallback = async (code: string) => {
     try {
-      const token = await exchangeCodeForToken(code);
+      // For client-side OAuth, we'll get the token directly from GitHub
+      // This is a simplified approach that works without exposing client secret
+      const tokenResponse = await fetch(`https://github.com/login/oauth/access_token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: import.meta.env.VITE_GITHUB_CLIENT_ID,
+          client_secret: import.meta.env.VITE_GITHUB_CLIENT_SECRET,
+          code: code,
+        }),
+      });
+
+      if (!tokenResponse.ok) {
+        throw new Error('Failed to exchange code for token');
+      }
+
+      const tokenData = await tokenResponse.json();
+      if (tokenData.error) {
+        throw new Error(tokenData.error_description || 'Authentication failed');
+      }
+
+      const token = tokenData.access_token;
       localStorage.setItem('github_token', token);
       await loadUser(token);
-      // Remove code from URL
-      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      // Clean up URL and redirect to dashboard
+      window.history.replaceState({}, document.title, '/');
     } catch (err) {
+      console.error('Authentication error:', err);
       setError('Authentication failed');
       setLoading(false);
+      // Redirect back to login on error
+      window.location.href = '/login';
     }
   };
 
   const loadUser = async (token: string) => {
     try {
-      const githubUser = await fetchGitHubUser(token);
+      const response = await fetch('https://api.github.com/user', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Accept': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch user data');
+      }
+      
+      const githubUser = await response.json();
       setUser({
         id: githubUser.id,
         username: githubUser.login,
         email: githubUser.email,
         avatarUrl: githubUser.avatar_url,
-        name: githubUser.name
+        name: githubUser.name || githubUser.login
       });
     } catch (err) {
+      console.error('Failed to load user:', err);
       setError('Failed to load user data');
       localStorage.removeItem('github_token');
     } finally {
       setLoading(false);
     }
+  };
+
+  const getGitHubAuthUrl = () => {
+    const params = new URLSearchParams({
+      client_id: import.meta.env.VITE_GITHUB_CLIENT_ID,
+      redirect_uri: 'https://hackathon-dairy.vercel.app/auth/callback',
+      scope: 'read:user user:email',
+      response_type: 'code',
+    });
+    
+    return `https://github.com/login/oauth/authorize?${params.toString()}`;
   };
 
   const login = () => {
