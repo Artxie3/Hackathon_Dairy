@@ -24,11 +24,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check for auth callback
+    // Check for auth callback on any page
     const searchParams = new URLSearchParams(window.location.search);
     const code = searchParams.get('code');
     
-    if (code && window.location.pathname === '/auth/callback') {
+    if (code) {
+      console.log('Found authorization code, processing...');
       handleAuthCallback(code);
     } else {
       // Check for existing session
@@ -43,6 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleAuthCallback = async (code: string) => {
     try {
+      console.log('Exchanging code for token...');
       // Use our API route to exchange code for token
       const tokenResponse = await fetch('/api/auth/github', {
         method: 'POST',
@@ -60,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const tokenData = await tokenResponse.json();
       const token = tokenData.access_token;
       
+      console.log('Token received, loading user...');
       localStorage.setItem('github_token', token);
       await loadUser(token);
       
@@ -67,15 +70,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.history.replaceState({}, document.title, '/');
     } catch (err) {
       console.error('Authentication error:', err);
-      setError('Authentication failed');
+      setError('Authentication failed: ' + (err as Error).message);
       setLoading(false);
-      // Redirect back to login on error
-      window.location.href = '/login';
+      // Don't redirect on error, let user see the error
     }
   };
 
   const loadUser = async (token: string) => {
     try {
+      console.log('Loading user data...');
       const response = await fetch('https://api.github.com/user', {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -88,6 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       const githubUser = await response.json();
+      console.log('User loaded successfully:', githubUser.login);
       setUser({
         id: githubUser.id,
         username: githubUser.login,
@@ -107,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const getGitHubAuthUrl = () => {
     const params = new URLSearchParams({
       client_id: import.meta.env.VITE_GITHUB_CLIENT_ID,
-      redirect_uri: 'https://hackathon-dairy.vercel.app/auth/callback',
+      redirect_uri: 'https://hackathon-dairy.vercel.app/',
       scope: 'read:user user:email',
       response_type: 'code',
     });
