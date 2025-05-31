@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '../utils/supabase';
 
 interface User {
   id: number;
@@ -92,6 +93,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       const githubUser = await response.json();
       console.log('User loaded successfully:', githubUser.login);
+
+      // Create or get Supabase user
+      const { error: signInError } = await supabase.auth.signInWithOAuth({
+        provider: 'github',
+        options: {
+          redirectTo: window.location.origin,
+          scopes: 'read:user user:email',
+        }
+      });
+
+      if (signInError) {
+        console.error('Supabase auth error:', signInError);
+        throw signInError;
+      }
+
+      // Set the user state with GitHub data
       setUser({
         id: githubUser.id,
         username: githubUser.login,
@@ -103,6 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Failed to load user:', err);
       setError('Failed to load user data');
       localStorage.removeItem('github_token');
+      await supabase.auth.signOut();
     } finally {
       setLoading(false);
     }
@@ -123,8 +141,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.href = getGitHubAuthUrl();
   };
 
-  const logout = () => {
+  const logout = async () => {
     localStorage.removeItem('github_token');
+    await supabase.auth.signOut();
     setUser(null);
   };
 
