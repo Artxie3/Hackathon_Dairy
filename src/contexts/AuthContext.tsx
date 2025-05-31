@@ -94,14 +94,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const githubUser = await response.json();
       console.log('User loaded successfully:', githubUser.login);
 
-      // Create anonymous session for Supabase
-      const { error: anonError } = await supabase.auth.signInAnonymously();
-
-      if (anonError) {
-        console.error('Supabase auth error:', anonError);
-        // Continue anyway - the GitHub auth is what matters most
-      }
-
       // Set the user state with GitHub data
       setUser({
         id: githubUser.id,
@@ -114,7 +106,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Failed to load user:', err);
       setError('Failed to load user data');
       localStorage.removeItem('github_token');
-      await supabase.auth.signOut();
     } finally {
       setLoading(false);
     }

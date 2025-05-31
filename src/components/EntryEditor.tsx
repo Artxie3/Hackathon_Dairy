@@ -36,12 +36,13 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
     }
 
     try {
+      // Save the entry with the local audio URL
       await onSave({
         ...entry,
         title: title.trim(),
         content: content.trim(),
         mood,
-        audio_url: audioUrl,
+        audio_url: audioUrl, // This will be a local blob URL
         is_draft: false,
       });
       setError(null);
@@ -52,7 +53,7 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
   };
 
   const handleAudioComplete = (blob: Blob) => {
-    // Create a local URL for preview
+    // Create a local URL for preview and storage
     const url = URL.createObjectURL(blob);
     setAudioUrl(url);
     setAudioBlob(blob);
