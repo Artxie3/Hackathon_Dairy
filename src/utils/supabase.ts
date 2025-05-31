@@ -12,32 +12,61 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // Initialize storage bucket for voice notes
 export async function initializeStorage() {
   try {
+    // First ensure we have an authenticated user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.warn('No authenticated user found. Storage operations may fail.');
+      return;
+    }
+
     // Check if bucket exists
-    const { data: buckets } = await supabase.storage.listBuckets();
+    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+    
+    if (listError) {
+      // If we get a permission error, the bucket might exist but we can't list it
+      if (listError.message.includes('Permission denied')) {
+        console.info('Cannot list buckets, assuming voice-notes exists');
+        return;
+      }
+      throw listError;
+    }
+
     const voiceNotesBucket = buckets?.find(bucket => bucket.name === 'voice-notes');
 
     if (!voiceNotesBucket) {
-      // Create the bucket if it doesn't exist
-      const { data, error } = await supabase.storage.createBucket('voice-notes', {
-        public: true, // Allow public access to files
+      console.info('Creating voice-notes bucket...');
+      const { error: createError } = await supabase.storage.createBucket('voice-notes', {
+        public: false, // Keep private, we'll use RLS policies
         fileSizeLimit: 52428800, // 50MB limit
         allowedMimeTypes: ['audio/webm', 'audio/mp3', 'audio/wav', 'audio/mpeg', 'audio/ogg']
       });
 
-      if (error) {
-        console.error('Error creating voice-notes bucket:', error);
-        throw error;
+      if (createError) {
+        // If bucket already exists or we don't have permission, that's okay
+        if (!createError.message.includes('Permission denied') && 
+            !createError.message.includes('already exists')) {
+          throw createError;
+        }
       }
+    }
 
-      // Set public bucket policy
-      const { error: policyError } = await supabase.storage.from('voice-notes').getPublicUrl('dummy.txt');
-      if (policyError && !policyError.message.includes('The resource was not found')) {
-        console.error('Error setting bucket policy:', policyError);
-      }
+    // Test bucket access by trying to list files
+    const { error: testError } = await supabase.storage
+      .from('voice-notes')
+      .list(user.id); // List files in user's directory
+
+    if (testError && !testError.message.includes('Permission denied')) {
+      console.warn('Storage test failed:', testError.message);
     }
   } catch (err) {
     console.error('Error initializing storage:', err);
+    // Don't throw - let the app continue even if storage init fails
   }
+}
+
+// Helper function to get a storage path for a user's audio file
+export function getUserAudioPath(userId: string, filename: string) {
+  return `${userId}/${filename}`;
 }
 
 // Call initializeStorage when the app starts

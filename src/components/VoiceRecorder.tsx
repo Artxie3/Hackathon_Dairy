@@ -1,14 +1,10 @@
 import React, { useState, useRef } from 'react';
 import { Mic, Square, Loader } from 'lucide-react';
-import { supabase } from '../utils/supabase';
+import { supabase, getUserAudioPath } from '../utils/supabase';
 
 interface VoiceRecorderProps {
   onRecordingComplete: (url: string) => void;
   onError: (error: string) => void;
-}
-
-interface StorageError {
-  message?: string;
 }
 
 export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onRecordingComplete, onError }) => {
@@ -19,6 +15,13 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onRecordingComplet
 
   const startRecording = async () => {
     try {
+      // Check if user is authenticated
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        onError('You must be logged in to record audio');
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           channelCount: 1,
@@ -52,7 +55,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onRecordingComplet
 
       mediaRecorder.current.onstop = async () => {
         const audioBlob = new Blob(audioChunks.current, { type: mimeType });
-        await uploadAudio(audioBlob, mimeType);
+        await uploadAudio(audioBlob, mimeType, user.id);
       };
 
       mediaRecorder.current.onerror = (event) => {
@@ -85,47 +88,51 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onRecordingComplet
     }
   };
 
-  const uploadAudio = async (audioBlob: Blob, mimeType: string) => {
+  const uploadAudio = async (audioBlob: Blob, mimeType: string, userId: string) => {
     try {
       setIsUploading(true);
-      
-      // Convert to MP3 if possible for better compatibility
-      let uploadBlob = audioBlob;
-      const fileExtension = mimeType.split('/')[1];
       
       // Generate a unique filename with timestamp and random string
       const timestamp = Date.now();
       const random = Math.random().toString(36).substring(2, 15);
+      const fileExtension = mimeType.split('/')[1];
       const filename = `audio-${timestamp}-${random}.${fileExtension}`;
       
+      // Get the full storage path including user ID
+      const storagePath = getUserAudioPath(userId, filename);
+
       // Upload to Supabase Storage
       const { data, error } = await supabase.storage
         .from('voice-notes')
-        .upload(filename, uploadBlob, {
+        .upload(storagePath, audioBlob, {
           contentType: mimeType,
-          cacheControl: '3600',
-          upsert: false
+          cacheControl: '3600'
         });
 
       if (error) {
         throw error;
       }
 
-      // Get the public URL
+      // Get the URL for the uploaded file
       const { data: { publicUrl } } = supabase.storage
         .from('voice-notes')
-        .getPublicUrl(filename);
+        .getPublicUrl(storagePath);
 
       onRecordingComplete(publicUrl);
     } catch (err) {
       console.error('Error uploading audio:', err);
-      const error = err as StorageError;
-      if (error.message?.includes('storage/bucket-not-found')) {
-        onError('Storage not configured. Please contact support.');
-      } else if (error.message?.includes('storage/object-too-large')) {
-        onError('Recording is too large. Please try a shorter recording.');
+      if (err instanceof Error) {
+        if (err.message.includes('storage/bucket-not-found')) {
+          onError('Storage not configured. Please contact support.');
+        } else if (err.message.includes('storage/object-too-large')) {
+          onError('Recording is too large. Please try a shorter recording.');
+        } else if (err.message.includes('Permission denied')) {
+          onError('You do not have permission to upload audio. Please log in again.');
+        } else {
+          onError('Failed to upload audio recording. Please try again.');
+        }
       } else {
-        onError('Failed to upload audio recording. Please try again.');
+        onError('An unexpected error occurred. Please try again.');
       }
     } finally {
       setIsUploading(false);
