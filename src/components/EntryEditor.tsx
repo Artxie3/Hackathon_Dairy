@@ -25,6 +25,7 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
   const [title, setTitle] = useState(entry.title || '');
   const [content, setContent] = useState(entry.content || '');
   const [mood, setMood] = useState(entry.mood || '');
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState(entry.audio_url || '');
   const [error, setError] = useState<string | null>(null);
 
@@ -50,14 +51,25 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
     }
   };
 
-  const handleAudioComplete = (url: string) => {
+  const handleAudioComplete = (blob: Blob) => {
+    // Create a local URL for preview
+    const url = URL.createObjectURL(blob);
     setAudioUrl(url);
+    setAudioBlob(blob);
     setError(null);
   };
 
   const handleAudioError = (errorMessage: string) => {
     console.error('Audio recording error:', errorMessage);
     setError(errorMessage);
+  };
+
+  const handleRemoveAudio = () => {
+    if (audioUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(audioUrl);
+    }
+    setAudioUrl('');
+    setAudioBlob(null);
   };
 
   return (
@@ -105,7 +117,7 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
       />
 
       {/* Voice Note */}
-      <div className="space-y-4">
+      <div>
         <div className="flex items-center gap-4">
           <VoiceRecorder
             onRecordingComplete={handleAudioComplete}
@@ -113,7 +125,7 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
           />
           {audioUrl && (
             <button
-              onClick={() => setAudioUrl('')}
+              onClick={handleRemoveAudio}
               className="text-sm text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
             >
               Remove Recording

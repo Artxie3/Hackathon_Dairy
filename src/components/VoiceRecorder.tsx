@@ -1,15 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, Square, Loader } from 'lucide-react';
-import { supabase, getUserAudioPath, waitForAuth } from '../utils/supabase';
 
 interface VoiceRecorderProps {
-  onRecordingComplete: (url: string) => void;
+  onRecordingComplete: (blob: Blob) => void;
   onError: (error: string) => void;
 }
 
 export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onRecordingComplete, onError }) => {
   const [isRecording, setIsRecording] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
@@ -29,20 +27,6 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onRecordingComplet
     try {
       setIsChecking(true);
       setRecordingDuration(0);
-      
-      // Wait for authentication to be ready
-      const isAuthenticated = await waitForAuth();
-      if (!isAuthenticated) {
-        onError('Please sign in to record audio');
-        return;
-      }
-
-      // Get the authenticated user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        onError('You must be logged in to record audio');
-        return;
-      }
 
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
@@ -81,7 +65,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onRecordingComplet
           durationInterval.current = null;
         }
         const audioBlob = new Blob(audioChunks.current, { type: mimeType });
-        await uploadAudio(audioBlob, mimeType, user.id);
+        onRecordingComplete(audioBlob);
       };
 
       mediaRecorder.current.onerror = (event) => {
@@ -131,64 +115,13 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onRecordingComplet
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const uploadAudio = async (audioBlob: Blob, mimeType: string, userId: string) => {
-    try {
-      setIsUploading(true);
-      
-      // Generate a unique filename with timestamp and random string
-      const timestamp = Date.now();
-      const random = Math.random().toString(36).substring(2, 15);
-      const fileExtension = mimeType.split('/')[1];
-      const filename = `audio-${timestamp}-${random}.${fileExtension}`;
-      
-      // Get the full storage path including user ID
-      const storagePath = getUserAudioPath(userId, filename);
-
-      // Upload to Supabase Storage
-      const { data, error } = await supabase.storage
-        .from('voice-notes')
-        .upload(storagePath, audioBlob, {
-          contentType: mimeType,
-          cacheControl: '3600'
-        });
-
-      if (error) {
-        throw error;
-      }
-
-      // Get the URL for the uploaded file
-      const { data: { publicUrl } } = supabase.storage
-        .from('voice-notes')
-        .getPublicUrl(storagePath);
-
-      onRecordingComplete(publicUrl);
-    } catch (err) {
-      console.error('Error uploading audio:', err);
-      if (err instanceof Error) {
-        if (err.message.includes('storage/bucket-not-found')) {
-          onError('Storage not configured. Please contact support.');
-        } else if (err.message.includes('storage/object-too-large')) {
-          onError('Recording is too large. Please try a shorter recording.');
-        } else if (err.message.includes('Permission denied')) {
-          onError('You do not have permission to upload audio. Please log in again.');
-        } else {
-          onError('Failed to upload audio recording. Please try again.');
-        }
-      } else {
-        onError('An unexpected error occurred. Please try again.');
-      }
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
   return (
     <div className="flex items-center gap-3">
       {!isRecording ? (
         <button
           onClick={startRecording}
           className="p-2 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors"
-          disabled={isUploading || isChecking}
+          disabled={isChecking}
           title="Start recording"
         >
           {isChecking ? (
@@ -228,13 +161,6 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onRecordingComplet
               {formatDuration(recordingDuration)}
             </span>
           </div>
-        </div>
-      )}
-      
-      {isUploading && (
-        <div className="flex items-center text-sm text-gray-500">
-          <Loader className="animate-spin mr-2" size={16} />
-          Uploading...
         </div>
       )}
     </div>
