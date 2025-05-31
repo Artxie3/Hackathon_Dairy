@@ -1,292 +1,223 @@
 import React, { useState } from 'react';
-import { 
-  Calendar, 
-  Pencil, 
-  Trash2, 
-  Plus, 
-  Search, 
-  Mic, 
-  XCircle, 
-  Filter,
-  Github 
-} from 'lucide-react';
+import { Plus, Search, Filter, X } from 'lucide-react';
+import { useDiary } from '../contexts/DiaryContext';
+import { EntryEditor } from '../components/EntryEditor';
+import { DiaryEntry } from '../utils/supabase';
 import '../styles/DiaryEntries.css';
 
-// Mock data for diary entries
-const MOCK_ENTRIES = [
-  {
-    id: 1,
-    date: '2023-04-20',
-    title: 'Fixed Critical Bug in Auth Flow',
-    content: 'Today I finally tracked down that authentication bug that was causing random logouts. It turned out to be a timing issue with token refresh. I felt really accomplished solving this one!',
-    mood: 'accomplished',
-    githubCommit: 'a1b2c3d',
-    githubRepo: 'auth-service',
-    tags: ['bug-fix', 'authentication'],
-    audioNote: null
-  },
-  {
-    id: 2,
-    date: '2023-04-19',
-    title: 'Struggling with React Context',
-    content: "I've been stuck for hours trying to figure out why my context isn't updating properly. I'm feeling really frustrated with this. Going to take a break and come back to it tomorrow with fresh eyes.",
-    mood: 'frustrated',
-    githubCommit: null,
-    githubRepo: null,
-    tags: ['react', 'debugging'],
-    audioNote: 'audio-note-2.mp3'
-  },
-  {
-    id: 3,
-    date: '2023-04-18',
-    title: 'Started New Project - Task Manager',
-    content: "I'm excited to start working on this new task manager app. I've mapped out the main features and created the initial project structure. Really looking forward to building this out!",
-    mood: 'excited',
-    githubCommit: 'e5f6g7h',
-    githubRepo: 'task-manager',
-    tags: ['new-project', 'planning'],
-    audioNote: null
-  }
-];
-
 const DiaryEntries: React.FC = () => {
-  const [entries, setEntries] = useState(MOCK_ENTRIES);
+  const { entries, loading, error, createEntry, updateEntry, deleteEntry } = useDiary();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isCreating, setIsCreating] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  
-  // All unique tags from entries
-  const allTags = Array.from(
-    new Set(entries.flatMap(entry => entry.tags))
-  );
-  
-  // Filter entries based on search and tags
+  const [editingEntry, setEditingEntry] = useState<DiaryEntry | null>(null);
+
+  // Get unique tags from all entries
+  const allTags = Array.from(new Set(entries.flatMap(entry => entry.tags || [])));
+
   const filteredEntries = entries.filter(entry => {
-    const matchesSearch = 
+    const matchesSearch = searchQuery === '' ||
       entry.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       entry.content.toLowerCase().includes(searchQuery.toLowerCase());
-      
-    const matchesTags = 
-      selectedTags.length === 0 || 
-      selectedTags.some(tag => entry.tags.includes(tag));
-      
+
+    const matchesTags = selectedTags.length === 0 ||
+      selectedTags.every(tag => entry.tags?.includes(tag));
+
     return matchesSearch && matchesTags;
   });
-  
+
+  const handleNewEntry = () => {
+    setIsCreating(true);
+    setEditingEntry(null);
+  };
+
+  const handleEditEntry = (entry: DiaryEntry) => {
+    setEditingEntry(entry);
+    setIsCreating(false);
+  };
+
+  const handleSaveEntry = async (entryData: Partial<DiaryEntry>) => {
+    try {
+      if (editingEntry) {
+        await updateEntry(editingEntry.id, entryData);
+      } else {
+        await createEntry(entryData);
+      }
+      setEditingEntry(null);
+      setIsCreating(false);
+    } catch (err) {
+      console.error('Error saving entry:', err);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingEntry(null);
+    setIsCreating(false);
+  };
+
   const toggleTag = (tag: string) => {
-    if (selectedTags.includes(tag)) {
-      setSelectedTags(selectedTags.filter(t => t !== tag));
-    } else {
-      setSelectedTags([...selectedTags, tag]);
-    }
+    setSelectedTags(prev =>
+      prev.includes(tag)
+        ? prev.filter(t => t !== tag)
+        : [...prev, tag]
+    );
   };
-  
-  const getMoodEmoji = (mood: string) => {
-    switch (mood) {
-      case 'accomplished': return '😊';
-      case 'frustrated': return '😣';
-      case 'excited': return '😃';
-      default: return '😐';
-    }
-  };
-  
-  return (
-    <div className="diary-container">
-      <div className="diary-header">
-        <h1>Diary Entries</h1>
-        <button className="btn btn-primary new-entry-btn" onClick={() => setIsCreating(true)}>
-          <Plus size={16} />
-          <span>New Entry</span>
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-500 dark:text-red-400">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          Try Again
         </button>
       </div>
-      
-      <div className="diary-filters">
-        <div className="search-container">
-          <Search size={18} />
-          <input
-            type="text"
-            placeholder="Search entries..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="search-input"
-          />
-          {searchQuery && (
-            <button className="clear-search\" onClick={() => setSearchQuery('')}>
-              <XCircle size={16} />
-            </button>
-          )}
-        </div>
-        
-        <div className="tags-filter">
-          <div className="filter-label">
-            <Filter size={16} />
-            <span>Filter by tag:</span>
+    );
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Diary Entries</h1>
+        <button
+          onClick={handleNewEntry}
+          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2"
+        >
+          <Plus size={20} />
+          New Entry
+        </button>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="mb-6 space-y-4">
+        <div className="flex gap-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <input
+              type="text"
+              placeholder="Search entries..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:outline-none"
+            />
           </div>
-          <div className="tags-list">
-            {allTags.map(tag => (
-              <button
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <select
+              className="pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:outline-none appearance-none"
+              onChange={(e) => toggleTag(e.target.value)}
+              value=""
+            >
+              <option value="">Filter by tag</option>
+              {allTags.map(tag => (
+                <option key={tag} value={tag}>{tag}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Active Filters */}
+        {selectedTags.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {selectedTags.map(tag => (
+              <span
                 key={tag}
-                className={`tag-btn ${selectedTags.includes(tag) ? 'selected' : ''}`}
-                onClick={() => toggleTag(tag)}
+                className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full flex items-center gap-2"
               >
                 {tag}
-              </button>
+                <button onClick={() => toggleTag(tag)}>
+                  <X size={14} />
+                </button>
+              </span>
             ))}
-          </div>
-        </div>
-      </div>
-      
-      <div className="entries-list">
-        {filteredEntries.length > 0 ? (
-          filteredEntries.map(entry => (
-            <div key={entry.id} className="entry-card">
-              <div className="entry-header">
-                <div className="entry-date">
-                  <Calendar size={14} />
-                  <span>{new Date(entry.date).toLocaleDateString()}</span>
-                </div>
-                <div className="entry-mood">{getMoodEmoji(entry.mood)}</div>
-              </div>
-              
-              <h3 className="entry-title">{entry.title}</h3>
-              
-              <p className="entry-content">{entry.content}</p>
-              
-              {entry.githubCommit && (
-                <div className="entry-commit">
-                  <Github size={14} />
-                  <span>Commit <span className="commit-hash">{entry.githubCommit}</span> in {entry.githubRepo}</span>
-                </div>
-              )}
-              
-              {entry.audioNote && (
-                <div className="entry-audio">
-                  <audio controls src={entry.audioNote}>
-                    Your browser does not support the audio element.
-                  </audio>
-                </div>
-              )}
-              
-              <div className="entry-tags">
-                {entry.tags.map(tag => (
-                  <span key={tag} className="entry-tag">{tag}</span>
-                ))}
-              </div>
-              
-              <div className="entry-actions">
-                <button className="entry-action edit">
-                  <Pencil size={16} />
-                </button>
-                <button className="entry-action delete">
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="no-entries">
-            <p>No entries match your search criteria.</p>
           </div>
         )}
       </div>
-      
-      {isCreating && (
-        <div className="entry-modal-overlay">
-          <div className="entry-modal">
-            <div className="modal-header">
-              <h2>New Diary Entry</h2>
-              <button className="close-modal" onClick={() => setIsCreating(false)}>
-                <XCircle size={20} />
-              </button>
-            </div>
-            
-            <form className="entry-form">
-              <div className="form-group">
-                <label htmlFor="entry-title">Title</label>
-                <input 
-                  type="text" 
-                  id="entry-title" 
-                  placeholder="Give your entry a title"
-                  className="input"
-                />
-              </div>
-              
-              <div className="form-group">
-                <label htmlFor="entry-content">What's on your mind?</label>
-                <textarea 
-                  id="entry-content" 
-                  rows={5}
-                  placeholder="Write about your coding experience, challenges, achievements..."
-                  className="input"
-                ></textarea>
-              </div>
-              
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Mood</label>
-                  <select className="input">
-                    <option value="accomplished">Accomplished 😊</option>
-                    <option value="excited">Excited 😃</option>
-                    <option value="neutral">Neutral 😐</option>
-                    <option value="tired">Tired 😴</option>
-                    <option value="frustrated">Frustrated 😣</option>
-                  </select>
-                </div>
-                
-                <div className="form-group">
-                  <label>Link to GitHub commit (optional)</label>
-                  <input 
-                    type="text" 
-                    placeholder="Paste commit URL or ID"
-                    className="input"
-                  />
-                </div>
-              </div>
-              
-              <div className="form-group">
-                <label>Tags</label>
-                <input 
-                  type="text" 
-                  placeholder="Add tags separated by commas"
-                  className="input"
-                />
-              </div>
-              
-              <div className="audio-recording">
-                <button 
-                  type="button"
-                  className={`audio-btn ${isRecording ? 'recording' : ''}`}
-                  onClick={() => setIsRecording(!isRecording)}
-                >
-                  <Mic size={16} />
-                  <span>{isRecording ? 'Recording...' : 'Record Audio Note'}</span>
-                </button>
-                
-                {isRecording && (
-                  <div className="recording-indicator">
-                    <div className="recording-waves">
-                      <div className="wave"></div>
-                      <div className="wave"></div>
-                      <div className="wave"></div>
-                    </div>
-                    <span>00:15</span>
-                  </div>
-                )}
-              </div>
-              
-              <div className="form-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setIsCreating(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Save Entry
-                </button>
-              </div>
-            </form>
-          </div>
+
+      {/* Entry Editor */}
+      {(isCreating || editingEntry) && (
+        <div className="mb-8">
+          <EntryEditor
+            entry={editingEntry || {}}
+            onSave={handleSaveEntry}
+            onCancel={handleCancelEdit}
+          />
         </div>
       )}
+
+      {/* Entries List */}
+      <div className="space-y-6">
+        {filteredEntries.map(entry => (
+          <div
+            key={entry.id}
+            className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 cursor-pointer hover:shadow-xl transition-shadow"
+            onClick={() => handleEditEntry(entry)}
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-semibold">{entry.title}</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {new Date(entry.created_at).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                </p>
+              </div>
+              {entry.mood && (
+                <span className="text-2xl">{entry.mood}</span>
+              )}
+            </div>
+
+            <p className="text-gray-600 dark:text-gray-300 mb-4 line-clamp-3">
+              {entry.content}
+            </p>
+
+            {entry.audio_url && (
+              <div className="mb-4">
+                <audio controls src={entry.audio_url} className="w-full" />
+              </div>
+            )}
+
+            {entry.tags && entry.tags.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {entry.tags.map(tag => (
+                  <span
+                    key={tag}
+                    className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-full text-sm"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {entry.commit_hash && (
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400">
+                <p>Commit: {entry.commit_hash.substring(0, 7)}</p>
+                <p>Repository: {entry.commit_repo}</p>
+              </div>
+            )}
+          </div>
+        ))}
+
+        {filteredEntries.length === 0 && (
+          <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+            No entries found. Start writing your first entry!
+          </div>
+        )}
+      </div>
     </div>
   );
 };
