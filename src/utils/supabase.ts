@@ -9,10 +9,32 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Helper function to wait for authentication
+export async function waitForAuth(timeout = 5000): Promise<boolean> {
+  const startTime = Date.now();
+  
+  while (Date.now() - startTime < timeout) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      return true;
+    }
+    await new Promise(resolve => setTimeout(resolve, 100)); // Wait 100ms before next check
+  }
+  
+  return false;
+}
+
 // Initialize storage bucket for voice notes
 export async function initializeStorage() {
   try {
-    // First ensure we have an authenticated user
+    // Wait for auth to be ready
+    const isAuthenticated = await waitForAuth();
+    if (!isAuthenticated) {
+      console.warn('No authenticated user found after waiting. Storage operations may fail.');
+      return;
+    }
+
+    // Get the authenticated user
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       console.warn('No authenticated user found. Storage operations may fail.');

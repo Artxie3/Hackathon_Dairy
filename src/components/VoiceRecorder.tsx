@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Mic, Square, Loader } from 'lucide-react';
-import { supabase, getUserAudioPath } from '../utils/supabase';
+import { supabase, getUserAudioPath, waitForAuth } from '../utils/supabase';
 
 interface VoiceRecorderProps {
   onRecordingComplete: (url: string) => void;
@@ -10,12 +10,34 @@ interface VoiceRecorderProps {
 export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onRecordingComplete, onError }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const audioChunks = useRef<Blob[]>([]);
+  const durationInterval = useRef<NodeJS.Timeout | null>(null);
+
+  // Clean up interval on unmount
+  useEffect(() => {
+    return () => {
+      if (durationInterval.current) {
+        clearInterval(durationInterval.current);
+      }
+    };
+  }, []);
 
   const startRecording = async () => {
     try {
-      // Check if user is authenticated
+      setIsChecking(true);
+      setRecordingDuration(0);
+      
+      // Wait for authentication to be ready
+      const isAuthenticated = await waitForAuth();
+      if (!isAuthenticated) {
+        onError('Please sign in to record audio');
+        return;
+      }
+
+      // Get the authenticated user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         onError('You must be logged in to record audio');
@@ -54,6 +76,10 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onRecordingComplet
       };
 
       mediaRecorder.current.onstop = async () => {
+        if (durationInterval.current) {
+          clearInterval(durationInterval.current);
+          durationInterval.current = null;
+        }
         const audioBlob = new Blob(audioChunks.current, { type: mimeType });
         await uploadAudio(audioBlob, mimeType, user.id);
       };
@@ -64,7 +90,12 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onRecordingComplet
         stopRecording();
       };
 
-      mediaRecorder.current.start(1000); // Collect data every second
+      // Start recording and duration counter
+      mediaRecorder.current.start(1000);
+      durationInterval.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
+      
       setIsRecording(true);
     } catch (err) {
       console.error('Error starting recording:', err);
@@ -73,6 +104,8 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onRecordingComplet
       } else {
         onError('Failed to start recording. Please check your microphone settings.');
       }
+    } finally {
+      setIsChecking(false);
     }
   };
 
@@ -81,11 +114,21 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onRecordingComplet
       try {
         mediaRecorder.current.stop();
         mediaRecorder.current.stream.getTracks().forEach(track => track.stop());
+        if (durationInterval.current) {
+          clearInterval(durationInterval.current);
+          durationInterval.current = null;
+        }
       } catch (err) {
         console.error('Error stopping recording:', err);
       }
       setIsRecording(false);
     }
+  };
+
+  const formatDuration = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
   const uploadAudio = async (audioBlob: Blob, mimeType: string, userId: string) => {
@@ -140,24 +183,52 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onRecordingComplet
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-3">
       {!isRecording ? (
         <button
           onClick={startRecording}
           className="p-2 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors"
-          disabled={isUploading}
+          disabled={isUploading || isChecking}
           title="Start recording"
         >
-          <Mic size={20} />
+          {isChecking ? (
+            <Loader className="animate-spin" size={20} />
+          ) : (
+            <Mic size={20} />
+          )}
         </button>
       ) : (
-        <button
-          onClick={stopRecording}
-          className="p-2 rounded-full bg-gray-500 hover:bg-gray-600 text-white transition-colors animate-pulse"
-          title="Stop recording"
-        >
-          <Square size={20} />
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={stopRecording}
+            className="p-2 rounded-full bg-gray-500 hover:bg-gray-600 text-white transition-colors"
+            title="Stop recording"
+          >
+            <Square size={20} />
+          </button>
+          
+          {/* Recording Indicator */}
+          <div className="flex items-center gap-3 py-1 px-3 bg-red-100 dark:bg-red-900/30 rounded-full">
+            {/* Animated Waveform */}
+            <div className="flex items-center gap-0.5">
+              {[...Array(5)].map((_, i) => (
+                <div
+                  key={i}
+                  className="w-0.5 h-3 bg-red-500 dark:bg-red-400 animate-pulse"
+                  style={{
+                    animation: `pulse 1s ease-in-out infinite`,
+                    animationDelay: `${i * 0.15}s`
+                  }}
+                />
+              ))}
+            </div>
+            
+            {/* Duration */}
+            <span className="text-sm font-medium text-red-700 dark:text-red-300">
+              {formatDuration(recordingDuration)}
+            </span>
+          </div>
+        </div>
       )}
       
       {isUploading && (
