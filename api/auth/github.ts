@@ -11,11 +11,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).end();
   }
 
+  // For testing - return method info
+  if (req.method === 'GET') {
+    return res.status(200).json({ 
+      message: 'GitHub OAuth API endpoint', 
+      method: req.method,
+      envVars: {
+        hasClientId: !!process.env.GITHUB_CLIENT_ID,
+        hasClientSecret: !!process.env.GITHUB_CLIENT_SECRET,
+        nodeVersion: process.version
+      }
+    });
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
+    console.log('Processing OAuth request...');
+    
     const { code } = req.body;
 
     if (!code) {
@@ -25,15 +40,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const clientId = process.env.GITHUB_CLIENT_ID;
     const clientSecret = process.env.GITHUB_CLIENT_SECRET;
 
-    if (!clientId || !clientSecret) {
-      console.error('Missing environment variables:', { 
-        hasClientId: !!clientId, 
-        hasClientSecret: !!clientSecret 
-      });
-      return res.status(500).json({ error: 'Server configuration error' });
+    if (!clientId) {
+      return res.status(500).json({ error: 'GITHUB_CLIENT_ID not configured' });
     }
 
-    console.log('Attempting to exchange code for token...');
+    if (!clientSecret) {
+      return res.status(500).json({ error: 'GITHUB_CLIENT_SECRET not configured' });
+    }
+
+    console.log('Environment variables OK, exchanging code...');
 
     const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
       method: 'POST',
@@ -50,29 +65,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     if (!tokenResponse.ok) {
-      console.error('GitHub token response not ok:', tokenResponse.status, tokenResponse.statusText);
-      throw new Error(`GitHub API responded with ${tokenResponse.status}`);
+      console.error('GitHub API error:', tokenResponse.status, tokenResponse.statusText);
+      return res.status(500).json({ 
+        error: `GitHub API error: ${tokenResponse.status}` 
+      });
     }
 
     const tokenData = await tokenResponse.json();
-    console.log('Token response received:', { hasAccessToken: !!tokenData.access_token, error: tokenData.error });
+    console.log('Token response:', { hasAccessToken: !!tokenData.access_token, error: tokenData.error });
     
     if (tokenData.error) {
       return res.status(400).json({ 
-        error: tokenData.error_description || tokenData.error || 'Failed to exchange code for token' 
+        error: tokenData.error_description || tokenData.error 
       });
     }
 
     if (!tokenData.access_token) {
-      return res.status(400).json({ error: 'No access token received from GitHub' });
+      return res.status(400).json({ error: 'No access token received' });
     }
 
     return res.status(200).json({ access_token: tokenData.access_token });
+
   } catch (error) {
-    console.error('OAuth error:', error);
+    console.error('Unexpected error:', error);
     return res.status(500).json({ 
       error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      details: error instanceof Error ? error.message : String(error)
     });
   }
 } 
