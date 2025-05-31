@@ -1,13 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 
-interface GitHubEmail {
-  email: string;
-  primary: boolean;
-  verified: boolean;
-  visibility: string | null;
-}
-
 interface User {
   id: number;
   username: string;
@@ -87,8 +80,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadUser = async (token: string) => {
     try {
       console.log('Loading user data...');
-      
-      // First get user profile
       const response = await fetch('https://api.github.com/user', {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -101,66 +92,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       const githubUser = await response.json();
-      
-      // Explicitly fetch emails
-      const emailResponse = await fetch('https://api.github.com/user/emails', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Accept': 'application/json',
-        },
-      });
-      
-      if (emailResponse.ok) {
-        const emails = await emailResponse.json() as GitHubEmail[];
-        const primaryEmail = emails.find((email: GitHubEmail) => email.primary)?.email || emails[0]?.email;
-        if (primaryEmail) {
-          githubUser.email = primaryEmail;
-        }
-      }
-
       console.log('User loaded successfully:', githubUser.login);
 
-      if (!githubUser.email) {
-        console.warn('No email available from GitHub, skipping Supabase auth');
-        // Set user state anyway since we have GitHub auth
-        setUser({
-          id: githubUser.id,
-          username: githubUser.login,
-          email: '',
-          avatarUrl: githubUser.avatar_url,
-          name: githubUser.name || githubUser.login
-        });
-        return;
-      }
+      // Create anonymous session for Supabase
+      const { error: anonError } = await supabase.auth.signInAnonymously();
 
-      try {
-        // Try to sign in first
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: githubUser.email,
-          password: `gh_${githubUser.id}` // Consistent password based on GitHub ID
-        });
-
-        if (signInError) {
-          // If sign in fails, try to sign up
-          const { error: signUpError } = await supabase.auth.signUp({
-            email: githubUser.email,
-            password: `gh_${githubUser.id}`,
-            options: {
-              data: {
-                github_id: githubUser.id,
-                github_username: githubUser.login
-              }
-            }
-          });
-
-          if (signUpError) {
-            console.error('Supabase auth error:', signUpError);
-            // Continue anyway with GitHub auth
-          }
-        }
-      } catch (err) {
-        console.error('Supabase auth error:', err);
-        // Continue anyway with GitHub auth
+      if (anonError) {
+        console.error('Supabase auth error:', anonError);
+        // Continue anyway - the GitHub auth is what matters most
       }
 
       // Set the user state with GitHub data
@@ -192,10 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return `https://github.com/login/oauth/authorize?${params.toString()}`;
   };
 
-  const login = async () => {
-    // Sign out of Supabase first to ensure clean state
-    await supabase.auth.signOut();
-    // Then redirect to GitHub
+  const login = () => {
     window.location.href = getGitHubAuthUrl();
   };
 
