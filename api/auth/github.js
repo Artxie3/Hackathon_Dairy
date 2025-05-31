@@ -1,4 +1,4 @@
-export default function handler(req, res) {
+export default async function handler(req, res) {
   // Simple CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -10,7 +10,7 @@ export default function handler(req, res) {
 
   if (req.method === 'GET') {
     return res.status(200).json({ 
-      message: 'API is working',
+      message: 'GitHub OAuth API is working',
       timestamp: new Date().toISOString(),
       env: {
         hasClientId: !!process.env.GITHUB_CLIENT_ID,
@@ -24,7 +24,7 @@ export default function handler(req, res) {
       const { code } = req.body || {};
       
       if (!code) {
-        return res.status(400).json({ error: 'Code required' });
+        return res.status(400).json({ error: 'Authorization code required' });
       }
 
       if (!process.env.GITHUB_CLIENT_ID) {
@@ -35,16 +35,44 @@ export default function handler(req, res) {
         return res.status(500).json({ error: 'Missing GITHUB_CLIENT_SECRET' });
       }
 
-      // Simple test response
-      return res.status(200).json({ 
-        success: true, 
-        message: 'POST received',
-        codeLength: code.length 
+      // Exchange code for access token
+      const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          client_id: process.env.GITHUB_CLIENT_ID,
+          client_secret: process.env.GITHUB_CLIENT_SECRET,
+          code: code
+        })
       });
+
+      if (!tokenResponse.ok) {
+        return res.status(500).json({ 
+          error: `GitHub API error: ${tokenResponse.status}` 
+        });
+      }
+
+      const tokenData = await tokenResponse.json();
+
+      if (tokenData.error) {
+        return res.status(400).json({ 
+          error: tokenData.error_description || tokenData.error 
+        });
+      }
+
+      if (!tokenData.access_token) {
+        return res.status(400).json({ error: 'No access token received' });
+      }
+
+      return res.status(200).json({ access_token: tokenData.access_token });
 
     } catch (error) {
       return res.status(500).json({ 
-        error: error.message || 'Unknown error' 
+        error: 'Server error',
+        details: error.message || 'Unknown error' 
       });
     }
   }
