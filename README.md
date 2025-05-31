@@ -1,4 +1,4 @@
-# Coder Diary
+# Hackathon Diary
 
 A modern web application for developers to track their coding journey, projects, and insights.
 
