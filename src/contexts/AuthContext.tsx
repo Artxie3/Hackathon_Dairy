@@ -94,18 +94,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const githubUser = await response.json();
       console.log('User loaded successfully:', githubUser.login);
 
-      // Create or get Supabase user
-      const { error: signInError } = await supabase.auth.signInWithOAuth({
-        provider: 'github',
-        options: {
-          redirectTo: window.location.origin,
-          scopes: 'read:user user:email',
-        }
-      });
+      // Create anonymous session for Supabase
+      const { data: { session }, error: anonError } = await supabase.auth.signInAnonymously();
 
-      if (signInError) {
-        console.error('Supabase auth error:', signInError);
-        throw signInError;
+      if (anonError) {
+        console.error('Supabase auth error:', anonError);
+        // Continue anyway - the GitHub auth is what matters most
       }
 
       // Set the user state with GitHub data
