@@ -9,6 +9,53 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Sign in to Supabase using GitHub token
+export async function signInWithGitHub(token: string) {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'github',
+    options: {
+      skipBrowserRedirect: true,
+      queryParams: {
+        access_token: token
+      }
+    }
+  });
+
+  if (error) {
+    console.error('Supabase auth error:', error);
+    return false;
+  }
+
+  return !!data;
+}
+
+// Helper function to upload audio to Supabase storage
+export async function uploadAudio(userId: string, blob: Blob): Promise<string | null> {
+  try {
+    const filename = `${Date.now()}.webm`;
+    const filePath = getUserAudioPath(userId, filename);
+    
+    const { error: uploadError } = await supabase.storage
+      .from('voice-notes')
+      .upload(filePath, blob, {
+        contentType: blob.type,
+        cacheControl: '3600'
+      });
+
+    if (uploadError) throw uploadError;
+
+    // Get the public URL
+    const { data } = await supabase.storage
+      .from('voice-notes')
+      .getPublicUrl(filePath);
+    
+    return data.publicUrl;
+  } catch (err) {
+    console.error('Error uploading audio:', err);
+    return null;
+  }
+}
+
 // Helper function to wait for authentication
 export async function waitForAuth(timeout = 5000): Promise<boolean> {
   const startTime = Date.now();

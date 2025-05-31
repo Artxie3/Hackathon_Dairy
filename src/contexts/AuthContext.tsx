@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '../utils/supabase';
+import { supabase, signInWithGitHub } from '../utils/supabase';
 
 interface User {
   id: number;
@@ -93,6 +93,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       const githubUser = await response.json();
       console.log('User loaded successfully:', githubUser.login);
+
+      // Sign in to Supabase with GitHub token
+      await signInWithGitHub(token);
 
       // Set the user state with GitHub data
       setUser({
