@@ -21,7 +21,7 @@ export async function initializeStorage() {
       const { data, error } = await supabase.storage.createBucket('voice-notes', {
         public: true, // Allow public access to files
         fileSizeLimit: 52428800, // 50MB limit
-        allowedMimeTypes: ['audio/webm', 'audio/mp3', 'audio/wav', 'audio/mpeg']
+        allowedMimeTypes: ['audio/webm', 'audio/mp3', 'audio/wav', 'audio/mpeg', 'audio/ogg']
       });
 
       if (error) {
@@ -29,9 +29,9 @@ export async function initializeStorage() {
         throw error;
       }
 
-      // Set up bucket policy to allow public access
-      const { error: policyError } = await supabase.storage.from('voice-notes').createSignedUrl('dummy.txt', 3600);
-      if (policyError && !policyError.message.includes('does not exist')) {
+      // Set public bucket policy
+      const { error: policyError } = await supabase.storage.from('voice-notes').getPublicUrl('dummy.txt');
+      if (policyError && !policyError.message.includes('The resource was not found')) {
         console.error('Error setting bucket policy:', policyError);
       }
     }

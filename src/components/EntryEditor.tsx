@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Save, X, Play, Pause } from 'lucide-react';
+import React, { useState } from 'react';
+import { Save, X } from 'lucide-react';
 import { VoiceRecorder } from './VoiceRecorder';
+import { AudioPlayer } from './AudioPlayer';
 import { DiaryEntry } from '../utils/supabase';
 
 interface EntryEditorProps {
@@ -25,51 +26,48 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
   const [content, setContent] = useState(entry.content || '');
   const [mood, setMood] = useState(entry.mood || '');
   const [audioUrl, setAudioUrl] = useState(entry.audio_url || '');
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
-
-  useEffect(() => {
-    // Initialize audio element if we have a URL
-    if (audioUrl) {
-      const audio = new Audio(audioUrl);
-      audio.onended = () => setIsPlaying(false);
-      setAudioElement(audio);
-    }
-  }, [audioUrl]);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSave = async () => {
-    await onSave({
-      ...entry,
-      title,
-      content,
-      mood,
-      audio_url: audioUrl,
-      is_draft: false,
-    });
+    if (!title.trim()) {
+      setError('Please enter a title for your entry');
+      return;
+    }
+
+    try {
+      await onSave({
+        ...entry,
+        title: title.trim(),
+        content: content.trim(),
+        mood,
+        audio_url: audioUrl,
+        is_draft: false,
+      });
+      setError(null);
+    } catch (err) {
+      console.error('Error saving entry:', err);
+      setError('Failed to save entry. Please try again.');
+    }
   };
 
   const handleAudioComplete = (url: string) => {
     setAudioUrl(url);
+    setError(null);
   };
 
-  const handleAudioError = (error: string) => {
-    // You might want to show this error in the UI
-    console.error('Audio recording error:', error);
-  };
-
-  const toggleAudioPlayback = () => {
-    if (!audioElement) return;
-
-    if (isPlaying) {
-      audioElement.pause();
-    } else {
-      audioElement.play();
-    }
-    setIsPlaying(!isPlaying);
+  const handleAudioError = (errorMessage: string) => {
+    console.error('Audio recording error:', errorMessage);
+    setError(errorMessage);
   };
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 space-y-6">
+      {error && (
+        <div className="bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 px-4 py-2 rounded-lg">
+          {error}
+        </div>
+      )}
+
       {/* Title */}
       <input
         type="text"
@@ -107,20 +105,24 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
       />
 
       {/* Voice Note */}
-      <div className="flex items-center gap-4">
-        <VoiceRecorder
-          onRecordingComplete={handleAudioComplete}
-          onError={handleAudioError}
-        />
+      <div className="space-y-4">
+        <div className="flex items-center gap-4">
+          <VoiceRecorder
+            onRecordingComplete={handleAudioComplete}
+            onError={handleAudioError}
+          />
+          {audioUrl && (
+            <button
+              onClick={() => setAudioUrl('')}
+              className="text-sm text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+            >
+              Remove Recording
+            </button>
+          )}
+        </div>
 
         {audioUrl && (
-          <button
-            onClick={toggleAudioPlayback}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
-          >
-            {isPlaying ? <Pause size={16} /> : <Play size={16} />}
-            {isPlaying ? 'Pause' : 'Play'} Recording
-          </button>
+          <AudioPlayer src={audioUrl} className="mt-2" />
         )}
       </div>
 
