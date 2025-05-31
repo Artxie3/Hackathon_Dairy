@@ -2,9 +2,8 @@ import React, { useState } from 'react';
 import { Save, X } from 'lucide-react';
 import { VoiceRecorder } from './VoiceRecorder';
 import { AudioPlayer } from './AudioPlayer';
-import { DiaryEntry } from '../utils/supabase';
+import { DiaryEntry, audioStorage } from '../utils/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { uploadAudio } from '../utils/supabase';
 
 interface EntryEditorProps {
   entry: Partial<DiaryEntry>;
@@ -31,7 +30,7 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState(entry.audio_url || '');
   const [error, setError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -40,43 +39,52 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
     }
 
     try {
-      setIsSaving(true);
-      let finalAudioUrl = audioUrl;
-
-      // If we have a new audio recording, upload it
-      if (audioBlob && user) {
-        const uploadedUrl = await uploadAudio(user.id.toString(), audioBlob);
-        if (uploadedUrl) {
-          finalAudioUrl = uploadedUrl;
-        } else {
-          setError('Failed to upload audio recording');
-          return;
-        }
-      }
-
+      // Save the entry with the audio URL (either existing or newly uploaded)
       await onSave({
         ...entry,
         title: title.trim(),
         content: content.trim(),
         mood,
-        audio_url: finalAudioUrl,
+        audio_url: audioUrl,
         is_draft: false,
       });
       setError(null);
     } catch (err) {
       console.error('Error saving entry:', err);
       setError('Failed to save entry. Please try again.');
-    } finally {
-      setIsSaving(false);
     }
   };
 
-  const handleAudioComplete = (blob: Blob) => {
-    // Create a local URL for preview
-    const url = URL.createObjectURL(blob);
-    setAudioUrl(url);
-    setAudioBlob(blob);
-    setError(null);
+  const handleAudioComplete = async (blob: Blob) => {
+    if (!user?.supabaseId) {
+      setError('Please ensure you are properly authenticated to record audio');
+      return;
+    }
+
+    setIsUploadingAudio(true);
+    try {
+      // Upload to Supabase Storage
+      const uploadedUrl = await audioStorage.uploadAudio(blob, user.supabaseId);
+      
+      if (uploadedUrl) {
+        setAudioUrl(uploadedUrl);
+        setAudioBlob(blob);
+        setError(null);
+        console.log('Audio uploaded successfully to Supabase');
+      } else {
+        throw new Error('Failed to upload audio to storage');
+      }
+    } catch (err) {
+      console.error('Error uploading audio:', err);
+      setError('Failed to save audio recording. Please try again.');
+      
+      // Fallback to local blob URL for preview
+      const localUrl = URL.createObjectURL(blob);
+      setAudioUrl(localUrl);
+      setAudioBlob(blob);
+    } finally {
+      setIsUploadingAudio(false);
+    }
   };
 
   const handleAudioError = (errorMessage: string) => {
@@ -84,10 +92,19 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
     setError(errorMessage);
   };
 
-  const handleRemoveAudio = () => {
-    if (audioUrl.startsWith('blob:')) {
+  const handleRemoveAudio = async () => {
+    if (audioUrl && !audioUrl.startsWith('blob:')) {
+      // If it's a Supabase URL, delete from storage
+      try {
+        await audioStorage.deleteAudio(audioUrl);
+      } catch (err) {
+        console.error('Error deleting audio from storage:', err);
+      }
+    } else if (audioUrl.startsWith('blob:')) {
+      // If it's a local blob URL, revoke it
       URL.revokeObjectURL(audioUrl);
     }
+    
     setAudioUrl('');
     setAudioBlob(null);
   };
@@ -151,6 +168,11 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
               Remove Recording
             </button>
           )}
+          {isUploadingAudio && (
+            <span className="text-sm text-blue-500 dark:text-blue-400">
+              Uploading audio...
+            </span>
+          )}
         </div>
 
         {audioUrl && (
@@ -171,17 +193,16 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
         <button
           onClick={onCancel}
           className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
-          disabled={isSaving}
         >
           <X size={20} />
         </button>
         <button
           onClick={handleSave}
-          disabled={isSaving}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 disabled:opacity-50"
+          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2"
+          disabled={isUploadingAudio}
         >
           <Save size={20} />
-          {isSaving ? 'Saving...' : 'Save Entry'}
+          Save Entry
         </button>
       </div>
     </div>

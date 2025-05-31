@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase, signInWithGitHub } from '../utils/supabase';
+import { supabase } from '../utils/supabase';
 
 interface User {
   id: number;
@@ -7,6 +7,7 @@ interface User {
   email: string;
   avatarUrl: string;
   name: string;
+  supabaseId?: string; // Add Supabase user ID
 }
 
 interface AuthContextType {
@@ -94,16 +95,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const githubUser = await response.json();
       console.log('User loaded successfully:', githubUser.login);
 
-      // Sign in to Supabase with GitHub token
-      await signInWithGitHub(token);
+      // Create or get Supabase user using GitHub data
+      const supabaseUser = await createSupabaseUser(githubUser, token);
 
-      // Set the user state with GitHub data
+      // Set the user state with GitHub data and Supabase ID
       setUser({
         id: githubUser.id,
         username: githubUser.login,
         email: githubUser.email,
         avatarUrl: githubUser.avatar_url,
-        name: githubUser.name || githubUser.login
+        name: githubUser.name || githubUser.login,
+        supabaseId: supabaseUser?.id
       });
     } catch (err) {
       console.error('Failed to load user:', err);
@@ -111,6 +113,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem('github_token');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const createSupabaseUser = async (githubUser: any, token: string) => {
+    try {
+      // Try to sign in with existing account first
+      const email = githubUser.email || `${githubUser.login}@github.user`;
+      const password = `gh_${githubUser.id}_secure_password`;
+
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password,
+      });
+
+      if (signInData?.user) {
+        console.log('Supabase user signed in successfully');
+        return signInData.user;
+      }
+
+      // If sign in failed, try to create new user
+      if (signInError) {
+        console.log('Creating new Supabase user...');
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email: email,
+          password: password,
+          options: {
+            data: {
+              github_id: githubUser.id,
+              github_login: githubUser.login,
+              github_token: token,
+              avatar_url: githubUser.avatar_url,
+              name: githubUser.name || githubUser.login,
+              full_name: githubUser.name || githubUser.login
+            }
+          }
+        });
+
+        if (signUpError) {
+          console.error('Supabase signup error:', signUpError);
+          return null;
+        }
+
+        console.log('Supabase user created successfully');
+        return signUpData.user;
+      }
+    } catch (err) {
+      console.error('Error creating Supabase user:', err);
+      return null;
     }
   };
 

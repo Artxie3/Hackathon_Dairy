@@ -9,65 +9,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Sign in to Supabase using GitHub token
-export async function signInWithGitHub(token: string) {
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'github',
-    options: {
-      skipBrowserRedirect: true,
-      queryParams: {
-        access_token: token
-      }
-    }
-  });
-
-  if (error) {
-    console.error('Supabase auth error:', error);
-    return false;
-  }
-
-  return !!data;
-}
-
-// Helper function to upload audio to Supabase storage
-export async function uploadAudio(userId: string, blob: Blob): Promise<string | null> {
-  try {
-    // Get current user to ensure we're authenticated
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      console.error('No authenticated user found');
-      return null;
-    }
-
-    const filename = `${Date.now()}.webm`;
-    // Use the Supabase user ID instead of GitHub username
-    const filePath = getUserAudioPath(user.id, filename);
-    
-    const { error: uploadError } = await supabase.storage
-      .from('voice-notes')
-      .upload(filePath, blob, {
-        contentType: blob.type,
-        cacheControl: '3600',
-        upsert: false
-      });
-
-    if (uploadError) {
-      console.error('Upload error:', uploadError);
-      throw uploadError;
-    }
-
-    // Get the public URL
-    const { data } = await supabase.storage
-      .from('voice-notes')
-      .getPublicUrl(filePath);
-    
-    return data.publicUrl;
-  } catch (err) {
-    console.error('Error uploading audio:', err);
-    return null;
-  }
-}
-
 // Helper function to wait for authentication
 export async function waitForAuth(timeout = 5000): Promise<boolean> {
   const startTime = Date.now();
@@ -100,44 +41,16 @@ export async function initializeStorage() {
       return;
     }
 
-    // Check if bucket exists
-    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-    
-    if (listError) {
-      // If we get a permission error, the bucket might exist but we can't list it
-      if (listError.message.includes('Permission denied')) {
-        console.info('Cannot list buckets, assuming voice-notes exists');
-        return;
-      }
-      throw listError;
-    }
-
-    const voiceNotesBucket = buckets?.find(bucket => bucket.name === 'voice-notes');
-
-    if (!voiceNotesBucket) {
-      console.info('Creating voice-notes bucket...');
-      const { error: createError } = await supabase.storage.createBucket('voice-notes', {
-        public: false, // Keep private, we'll use RLS policies
-        fileSizeLimit: 52428800, // 50MB limit
-        allowedMimeTypes: ['audio/webm', 'audio/mp3', 'audio/wav', 'audio/mpeg', 'audio/ogg']
-      });
-
-      if (createError) {
-        // If bucket already exists or we don't have permission, that's okay
-        if (!createError.message.includes('Permission denied') && 
-            !createError.message.includes('already exists')) {
-          throw createError;
-        }
-      }
-    }
-
     // Test bucket access by trying to list files
     const { error: testError } = await supabase.storage
       .from('voice-notes')
       .list(user.id); // List files in user's directory
 
-    if (testError && !testError.message.includes('Permission denied')) {
+    if (testError) {
       console.warn('Storage test failed:', testError.message);
+      console.info('Make sure the voice-notes bucket exists and RLS policies are set up correctly');
+    } else {
+      console.log('Storage initialized successfully');
     }
   } catch (err) {
     console.error('Error initializing storage:', err);
@@ -149,6 +62,91 @@ export async function initializeStorage() {
 export function getUserAudioPath(userId: string, filename: string) {
   return `${userId}/${filename}`;
 }
+
+// Audio storage functions
+export const audioStorage = {
+  async uploadAudio(audioBlob: Blob, userId: string): Promise<string | null> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Generate unique filename
+      const timestamp = Date.now();
+      const extension = audioBlob.type.includes('webm') ? 'webm' : 'wav';
+      const filename = `voice_note_${timestamp}.${extension}`;
+      const filePath = getUserAudioPath(user.id, filename);
+
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('voice-notes')
+        .upload(filePath, audioBlob, {
+          contentType: audioBlob.type,
+          upsert: false
+        });
+
+      if (error) {
+        console.error('Storage upload error:', error);
+        throw error;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('voice-notes')
+        .getPublicUrl(filePath);
+
+      console.log('Audio uploaded successfully:', publicUrl);
+      return publicUrl;
+    } catch (err) {
+      console.error('Error uploading audio:', err);
+      return null;
+    }
+  },
+
+  async deleteAudio(audioUrl: string): Promise<boolean> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Extract file path from URL
+      const urlParts = audioUrl.split('/');
+      const fileName = urlParts[urlParts.length - 1];
+      const filePath = getUserAudioPath(user.id, fileName);
+
+      const { error } = await supabase.storage
+        .from('voice-notes')
+        .remove([filePath]);
+
+      if (error) {
+        console.error('Storage delete error:', error);
+        return false;
+      }
+
+      console.log('Audio deleted successfully');
+      return true;
+    } catch (err) {
+      console.error('Error deleting audio:', err);
+      return false;
+    }
+  },
+
+  async listUserAudio(userId: string) {
+    try {
+      const { data, error } = await supabase.storage
+        .from('voice-notes')
+        .list(userId);
+
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      console.error('Error listing audio files:', err);
+      return [];
+    }
+  }
+};
 
 // Call initializeStorage when the app starts
 initializeStorage();
