@@ -4,6 +4,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import Layout from './components/layout/Layout';
+import ProtectedRoute from './components/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
 import DiaryEntries from './pages/DiaryEntries';
 import Projects from './pages/Projects';
@@ -22,13 +23,15 @@ function App() {
           <Router>
             <Routes>
               <Route path="/login" element={<Login />} />
-              <Route path="/" element={<Layout />}>
-                <Route index element={<Dashboard />} />
-                <Route path="diary" element={<DiaryEntries />} />
-                <Route path="projects" element={<Projects />} />
-                <Route path="analytics" element={<Analytics />} />
-                <Route path="profile" element={<Profile />} />
-                <Route path="settings" element={<Settings />} />
+              <Route element={<ProtectedRoute />}>
+                <Route element={<Layout />}>
+                  <Route index element={<Dashboard />} />
+                  <Route path="diary" element={<DiaryEntries />} />
+                  <Route path="projects" element={<Projects />} />
+                  <Route path="analytics" element={<Analytics />} />
+                  <Route path="profile" element={<Profile />} />
+                  <Route path="settings" element={<Settings />} />
+                </Route>
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

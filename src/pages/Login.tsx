@@ -1,159 +1,50 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Code, Github, Youtube, Music } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import '../styles/Auth.css';
+import { Github } from 'lucide-react';
 
 const Login: React.FC = () => {
-  const [isLogin, setIsLogin] = useState(true);
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  
-  const { login, register } = useAuth();
+  const { login, user, loading } = useAuth();
   const navigate = useNavigate();
-  
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    
-    try {
-      if (isLogin) {
-        await login(email, password);
-      } else {
-        if (!name) {
-          throw new Error('Name is required');
-        }
-        await register(name, email, password);
-      }
+
+  React.useEffect(() => {
+    if (user) {
       navigate('/');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
     }
-  };
-  
-  return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <div className="auth-logo">
-          <Code size={32} />
-          <h1>Hackathon Diary</h1>
-        </div>
-        
-        <div className="auth-tabs">
-          <button 
-            className={`auth-tab ${isLogin ? 'active' : ''}`} 
-            onClick={() => setIsLogin(true)}
-          >
-            Login
-          </button>
-          <button 
-            className={`auth-tab ${!isLogin ? 'active' : ''}`} 
-            onClick={() => setIsLogin(false)}
-          >
-            Register
-          </button>
-        </div>
-        
-        <form className="auth-form" onSubmit={handleSubmit}>
-          {!isLogin && (
-            <div className="form-group">
-              <label htmlFor="name">Full Name</label>
-              <input
-                id="name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Enter your name"
-                className="input"
-                required
-              />
-            </div>
-          )}
-          
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
-              className="input"
-              required
-            />
-          </div>
-          
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              className="input"
-              required
-            />
-          </div>
-          
-          {error && <div className="auth-error">{error}</div>}
-          
-          <button 
-            type="submit" 
-            className={`btn btn-primary auth-submit ${loading ? 'loading' : ''}`}
-            disabled={loading}
-          >
-            {isLogin ? 'Login' : 'Create Account'}
-          </button>
-        </form>
-        
-        <div className="auth-divider">
-          <span>or continue with</span>
-        </div>
-        
-        <div className="social-logins">
-          <button className="social-btn github">
-            <Github size={18} />
-            <span>GitHub</span>
-          </button>
-          
-          <button className="social-btn youtube">
-            <Youtube size={18} />
-            <span>YouTube</span>
-          </button>
-          
-          <button className="social-btn spotify">
-            <Music size={18} />
-            <span>Spotify</span>
-          </button>
-        </div>
+  }, [user, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
       </div>
-      
-      <div className="auth-feature-list">
-        <div className="feature-card">
-          <h3>Link All Your Accounts</h3>
-          <p>Connect GitHub, Devpost, YouTube, Spotify and more for a complete coding journey.</p>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+      <div className="max-w-md w-full space-y-8 p-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+        <div className="text-center">
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Welcome to Coder Diary</h2>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Track your coding journey, share your progress, and connect with other developers
+          </p>
         </div>
-        
-        <div className="feature-card">
-          <h3>Track Your Progress</h3>
-          <p>Monitor your coding hours, GitHub commits and projects in one place.</p>
-        </div>
-        
-        <div className="feature-card">
-          <h3>Personal Advisor</h3>
-          <p>Get reminders for breaks and deadlines based on your work patterns.</p>
-        </div>
-        
-        <div className="feature-card">
-          <h3>Private Journal</h3>
-          <p>Add emotional context to your technical work with private notes.</p>
+
+        <div className="mt-8 space-y-6">
+          <button
+            onClick={login}
+            className="w-full flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-gray-800 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+          >
+            <Github className="w-5 h-5 mr-2" />
+            Continue with GitHub
+          </button>
+
+          <div className="text-center text-sm">
+            <p className="text-gray-600 dark:text-gray-400">
+              By continuing, you agree to our Terms of Service and Privacy Policy
+            </p>
+          </div>
         </div>
       </div>
     </div>
