@@ -45,7 +45,7 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
 
       // If we have a new audio recording, upload it
       if (audioBlob && user) {
-        const uploadedUrl = await uploadAudio(user.username, audioBlob);
+        const uploadedUrl = await uploadAudio(user.id.toString(), audioBlob);
         if (uploadedUrl) {
           finalAudioUrl = uploadedUrl;
         } else {

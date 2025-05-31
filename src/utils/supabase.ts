@@ -32,17 +32,29 @@ export async function signInWithGitHub(token: string) {
 // Helper function to upload audio to Supabase storage
 export async function uploadAudio(userId: string, blob: Blob): Promise<string | null> {
   try {
+    // Get current user to ensure we're authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.error('No authenticated user found');
+      return null;
+    }
+
     const filename = `${Date.now()}.webm`;
-    const filePath = getUserAudioPath(userId, filename);
+    // Use the Supabase user ID instead of GitHub username
+    const filePath = getUserAudioPath(user.id, filename);
     
     const { error: uploadError } = await supabase.storage
       .from('voice-notes')
       .upload(filePath, blob, {
         contentType: blob.type,
-        cacheControl: '3600'
+        cacheControl: '3600',
+        upsert: false
       });
 
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      console.error('Upload error:', uploadError);
+      throw uploadError;
+    }
 
     // Get the public URL
     const { data } = await supabase.storage
