@@ -43,31 +43,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleAuthCallback = async (code: string) => {
     try {
-      // For client-side OAuth, we'll get the token directly from GitHub
-      // This is a simplified approach that works without exposing client secret
-      const tokenResponse = await fetch(`https://github.com/login/oauth/access_token`, {
+      // Use our API route to exchange code for token
+      const tokenResponse = await fetch('/api/auth/github', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
         },
-        body: JSON.stringify({
-          client_id: import.meta.env.VITE_GITHUB_CLIENT_ID,
-          client_secret: import.meta.env.VITE_GITHUB_CLIENT_SECRET,
-          code: code,
-        }),
+        body: JSON.stringify({ code }),
       });
 
       if (!tokenResponse.ok) {
-        throw new Error('Failed to exchange code for token');
+        const errorData = await tokenResponse.json();
+        throw new Error(errorData.error || 'Failed to exchange code for token');
       }
 
       const tokenData = await tokenResponse.json();
-      if (tokenData.error) {
-        throw new Error(tokenData.error_description || 'Authentication failed');
-      }
-
       const token = tokenData.access_token;
+      
       localStorage.setItem('github_token', token);
       await loadUser(token);
       
