@@ -1,6 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 
+interface GitHubEmail {
+  email: string;
+  primary: boolean;
+  verified: boolean;
+  visibility: string | null;
+}
+
 interface User {
   id: number;
   username: string;
@@ -80,6 +87,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadUser = async (token: string) => {
     try {
       console.log('Loading user data...');
+      
+      // First get user profile
       const response = await fetch('https://api.github.com/user', {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -92,6 +101,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       const githubUser = await response.json();
+      
+      // Explicitly fetch emails
+      const emailResponse = await fetch('https://api.github.com/user/emails', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Accept': 'application/json',
+        },
+      });
+      
+      if (emailResponse.ok) {
+        const emails = await emailResponse.json() as GitHubEmail[];
+        const primaryEmail = emails.find((email: GitHubEmail) => email.primary)?.email || emails[0]?.email;
+        if (primaryEmail) {
+          githubUser.email = primaryEmail;
+        }
+      }
+
       console.log('User loaded successfully:', githubUser.login);
 
       if (!githubUser.email) {
@@ -166,7 +192,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return `https://github.com/login/oauth/authorize?${params.toString()}`;
   };
 
-  const login = () => {
+  const login = async () => {
+    // Sign out of Supabase first to ensure clean state
+    await supabase.auth.signOut();
+    // Then redirect to GitHub
     window.location.href = getGitHubAuthUrl();
   };
 
