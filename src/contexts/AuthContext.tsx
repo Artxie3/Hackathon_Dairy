@@ -94,12 +94,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const githubUser = await response.json();
       console.log('User loaded successfully:', githubUser.login);
 
-      // Create anonymous session for Supabase
-      const { data: { session }, error: anonError } = await supabase.auth.signInAnonymously();
+      if (!githubUser.email) {
+        console.warn('No email available from GitHub, skipping Supabase auth');
+        // Set user state anyway since we have GitHub auth
+        setUser({
+          id: githubUser.id,
+          username: githubUser.login,
+          email: '',
+          avatarUrl: githubUser.avatar_url,
+          name: githubUser.name || githubUser.login
+        });
+        return;
+      }
 
-      if (anonError) {
-        console.error('Supabase auth error:', anonError);
-        // Continue anyway - the GitHub auth is what matters most
+      try {
+        // Try to sign in first
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: githubUser.email,
+          password: `gh_${githubUser.id}` // Consistent password based on GitHub ID
+        });
+
+        if (signInError) {
+          // If sign in fails, try to sign up
+          const { error: signUpError } = await supabase.auth.signUp({
+            email: githubUser.email,
+            password: `gh_${githubUser.id}`,
+            options: {
+              data: {
+                github_id: githubUser.id,
+                github_username: githubUser.login
+              }
+            }
+          });
+
+          if (signUpError) {
+            console.error('Supabase auth error:', signUpError);
+            // Continue anyway with GitHub auth
+          }
+        }
+      } catch (err) {
+        console.error('Supabase auth error:', err);
+        // Continue anyway with GitHub auth
       }
 
       // Set the user state with GitHub data
