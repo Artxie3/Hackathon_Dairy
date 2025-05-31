@@ -1,25 +1,21 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Enable CORS
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
+export default async function handler(req, res) {
+  // Simple CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  // For testing - return method info
   if (req.method === 'GET') {
     return res.status(200).json({ 
-      message: 'GitHub OAuth API endpoint', 
-      method: req.method,
-      envVars: {
+      message: 'GitHub OAuth API is working',
+      timestamp: new Date().toISOString(),
+      envCheck: {
         hasClientId: !!process.env.GITHUB_CLIENT_ID,
         hasClientSecret: !!process.env.GITHUB_CLIENT_SECRET,
-        nodeVersion: process.version
+        clientIdLength: process.env.GITHUB_CLIENT_ID ? process.env.GITHUB_CLIENT_ID.length : 0
       }
     });
   }
@@ -29,9 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    console.log('Processing OAuth request...');
-    
-    const { code } = req.body;
+    const { code } = req.body || {};
 
     if (!code) {
       return res.status(400).json({ error: 'Authorization code is required' });
@@ -41,56 +35,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const clientSecret = process.env.GITHUB_CLIENT_SECRET;
 
     if (!clientId) {
-      return res.status(500).json({ error: 'GITHUB_CLIENT_ID not configured' });
+      return res.status(500).json({ error: 'GITHUB_CLIENT_ID missing' });
     }
 
     if (!clientSecret) {
-      return res.status(500).json({ error: 'GITHUB_CLIENT_SECRET not configured' });
+      return res.status(500).json({ error: 'GITHUB_CLIENT_SECRET missing' });
     }
 
-    console.log('Environment variables OK, exchanging code...');
-
-    const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+    // Exchange code for token
+    const response = await fetch('https://github.com/login/oauth/access_token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'Hackathon-Diary'
+        'Accept': 'application/json'
       },
       body: JSON.stringify({
         client_id: clientId,
         client_secret: clientSecret,
-        code: code,
-      }),
+        code: code
+      })
     });
 
-    if (!tokenResponse.ok) {
-      console.error('GitHub API error:', tokenResponse.status, tokenResponse.statusText);
+    if (!response.ok) {
       return res.status(500).json({ 
-        error: `GitHub API error: ${tokenResponse.status}` 
+        error: `GitHub API error: ${response.status}` 
       });
     }
 
-    const tokenData = await tokenResponse.json();
-    console.log('Token response:', { hasAccessToken: !!tokenData.access_token, error: tokenData.error });
-    
-    if (tokenData.error) {
+    const data = await response.json();
+
+    if (data.error) {
       return res.status(400).json({ 
-        error: tokenData.error_description || tokenData.error 
+        error: data.error_description || data.error 
       });
     }
 
-    if (!tokenData.access_token) {
+    if (!data.access_token) {
       return res.status(400).json({ error: 'No access token received' });
     }
 
-    return res.status(200).json({ access_token: tokenData.access_token });
+    return res.status(200).json({ access_token: data.access_token });
 
   } catch (error) {
-    console.error('Unexpected error:', error);
     return res.status(500).json({ 
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : String(error)
+      error: 'Server error',
+      message: error.message || 'Unknown error'
     });
   }
 } 
