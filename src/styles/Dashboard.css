@@ -206,7 +206,18 @@
 
 /* Calendar Card */
 .calendar-card {
-  grid-column: span 2;
+  grid-column: span 3;
+  grid-row: span 1;
+}
+
+.calendar-card .calendar-container {
+  box-shadow: none;
+  padding: 0;
+  background: transparent;
+}
+
+.dark-theme .calendar-card .calendar-container {
+  background: transparent;
 }
 
 .calendar-heatmap {
@@ -413,9 +424,11 @@
     grid-template-columns: repeat(2, 1fr);
   }
   
-  .stats-card,
-  .calendar-card,
-  .projects-card {
+  .stats-card {
+    grid-column: span 2;
+  }
+  
+  .calendar-card {
     grid-column: span 2;
   }
   
@@ -433,7 +446,6 @@
   .stats-card,
   .recent-commits-card,
   .calendar-card,
-  .projects-card,
   .listening-card {
     grid-column: span 1;
   }

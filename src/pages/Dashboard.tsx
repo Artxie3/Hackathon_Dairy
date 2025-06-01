@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Calendar, Clock, Github, ExternalLink, Headphones, Music, RefreshCw } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Github, ExternalLink, Headphones, Music, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useDashboard } from '../contexts/DashboardContext';
+import Calendar from '../components/Calendar';
 import '../styles/Dashboard.css';
+import '../styles/Calendar.css';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
@@ -34,41 +36,17 @@ const Dashboard: React.FC = () => {
     return fullName.split('/').pop() || fullName;
   };
 
-  // Generate calendar heatmap data
-  const generateCalendarData = () => {
-    const today = new Date();
-    const days = [];
-    
-    // Generate last 30 days
-    for (let i = 29; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - i);
-      const dateKey = date.toISOString().split('T')[0];
-      const commits = stats.commitActivity[dateKey] || 0;
-      
-      let level = '';
-      if (commits > 0) {
-        if (commits === 1) level = 'level-1';
-        else if (commits === 2) level = 'level-2';
-        else if (commits === 3) level = 'level-3';
-        else level = 'level-4';
-      }
-      
-      days.push({
-        date: dateKey,
-        commits,
-        level,
-        displayDate: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      });
-    }
-    
-    return days;
-  };
-
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await refreshData();
     setIsRefreshing(false);
+  };
+
+  const handleDateClick = (date: Date) => {
+    // Navigate to diary entries for the selected date
+    // This could open a modal or navigate to diary page with date filter
+    console.log('Clicked date:', date);
+    // You could implement navigation to diary page with date filter here
   };
 
   // Mock data for listening history (can be extended later)
@@ -76,8 +54,6 @@ const Dashboard: React.FC = () => {
     { id: 1, title: 'Lofi Hip Hop Mix', platform: 'YouTube', duration: '2h 15m' },
     { id: 2, title: 'Coding Playlist', platform: 'Spotify', duration: '1h 45m' },
   ];
-
-  const calendarDays = generateCalendarData();
   
   return (
     <div className="dashboard">
@@ -214,41 +190,11 @@ const Dashboard: React.FC = () => {
         {/* Calendar Widget */}
         <div className="dashboard-card calendar-card">
           <div className="card-header">
-            <h2>Commit Activity (Last 30 Days)</h2>
-            <Calendar size={18} />
+            <h2>Diary Calendar</h2>
+            <CalendarIcon size={18} />
           </div>
-          <div className="calendar-heatmap">
-            <div className="heatmap-grid">
-              {calendarDays.map((day, index) => (
-                <div 
-                  key={index} 
-                  className={`heatmap-cell ${day.level}`}
-                  title={`${day.displayDate}: ${day.commits} commits`}
-                  style={{ position: 'relative' }}
-                ></div>
-              ))}
-            </div>
-            <div style={{ 
-              marginTop: '1rem', 
-              fontSize: '0.75rem', 
-              color: 'var(--color-gray-500)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <span>
-                Weekly: {stats.weeklyCommits} | Monthly: {stats.monthlyCommits}
-              </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                <span>Less</span>
-                <div className="heatmap-cell" style={{ width: '10px', height: '10px' }}></div>
-                <div className="heatmap-cell level-1" style={{ width: '10px', height: '10px' }}></div>
-                <div className="heatmap-cell level-2" style={{ width: '10px', height: '10px' }}></div>
-                <div className="heatmap-cell level-3" style={{ width: '10px', height: '10px' }}></div>
-                <div className="heatmap-cell level-4" style={{ width: '10px', height: '10px' }}></div>
-                <span>More</span>
-              </div>
-            </div>
+          <div style={{ marginTop: '1rem' }}>
+            <Calendar onDateClick={handleDateClick} />
           </div>
         </div>
         
