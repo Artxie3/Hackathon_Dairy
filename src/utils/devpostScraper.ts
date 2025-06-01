@@ -26,21 +26,6 @@ export class DevpostScraper {
         throw new Error('Please provide a valid Devpost URL');
       }
 
-      // Special case for World's Largest Hackathon since we know the exact dates
-      if (devpostUrl.includes('worldslargesthackathon.devpost.com')) {
-        console.log('Using hardcoded data for World\'s Largest Hackathon');
-        return {
-          title: "World's Largest Hackathon presented by Bolt",
-          description: "Build with AI for a shot at some of the $1M+ in prizes",
-          startDate: this.createDateFromString('May 30 at 2:15AM', 'GMT-5').toISOString(),
-          endDate: this.createDateFromString('June 30 at 4:00PM', 'GMT-5').toISOString(),
-          submissionDeadline: this.createDateFromString('June 30 at 4:00PM', 'GMT-5').toISOString(),
-          devpostUrl,
-          status: 'ongoing' as const,
-          detectedTimezone: 'GMT-5'
-        };
-      }
-
       // Clean up URL and get dates URL
       const cleanUrl = devpostUrl.replace(/\/$/, '');
       const datesUrl = `${cleanUrl}/details/dates`;
@@ -294,26 +279,17 @@ export class DevpostScraper {
 
         console.log('Time conversion:', originalHours, ampm, '→', hours);
 
-        // Create date for 2025 in local timezone first
+        // Create date for 2025 exactly as it appears on Devpost
         const monthIndex = new Date(`${month} 1, 2025`).getMonth();
         console.log('Month conversion:', month, '→', monthIndex);
         
-        // Create the date in the specified timezone
+        // Create the date without any timezone conversion - keep it as displayed
         const date = new Date(2025, monthIndex, parseInt(day), hours, parseInt(minute), 0, 0);
         
-        console.log('Created local date:', date);
+        console.log('Created date (exact from Devpost):', date);
+        console.log('Local ISO string:', date.toISOString());
 
-        // Now adjust for the timezone - convert from detected timezone to UTC
-        const timezoneOffset = this.getTimezoneOffsetHours(timezone);
-        console.log('Timezone offset hours:', timezoneOffset);
-        
-        // Adjust the date by subtracting the timezone offset to get UTC
-        const utcDate = new Date(date.getTime() - (timezoneOffset * 60 * 60 * 1000));
-        
-        console.log('Final UTC date:', utcDate);
-        console.log('UTC ISO string:', utcDate.toISOString());
-
-        return utcDate;
+        return date;
       } else {
         console.log('No pattern matched for date string:', dateStr);
         
@@ -333,18 +309,16 @@ export class DevpostScraper {
           
           console.log('Fallback parts:', { month, day, hour, minute, ampm });
           
-          // Try to parse with fallback data
+          // Parse with fallback data - no timezone conversion
           let hours = parseInt(hour);
           if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
           if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
           
           const monthIndex = new Date(`${month} 1, 2025`).getMonth();
           const date = new Date(2025, monthIndex, parseInt(day), hours, parseInt(minute), 0, 0);
-          const timezoneOffset = this.getTimezoneOffsetHours(timezone);
-          const utcDate = new Date(date.getTime() - (timezoneOffset * 60 * 60 * 1000));
           
-          console.log('Fallback result:', utcDate);
-          return utcDate;
+          console.log('Fallback result (no conversion):', date);
+          return date;
         }
       }
     } catch (error) {
@@ -525,7 +499,7 @@ export class DevpostScraper {
     });
   }
 
-  // Helper method to create dates from strings like "May 30 at 2:15AM"
+  // Helper method to create dates from strings like "May 30 at 2:15AM" without timezone conversion
   private static createDateFromString(dateStr: string, timezone: string): Date {
     console.log('Creating date from string:', dateStr, 'timezone:', timezone);
     
@@ -541,23 +515,11 @@ export class DevpostScraper {
       
       const monthIndex = new Date(`${month} 1, 2025`).getMonth();
       
-      // GMT-5 means we need to ADD 5 hours to convert to UTC
-      // May 30 at 2:15AM GMT-5 = May 30 at 7:15AM UTC
-      // June 30 at 4:00PM GMT-5 = June 30 at 9:00PM UTC
-      const utcHours = hours + 5;
-      let finalDay = parseInt(day);
-      let finalHours = utcHours;
+      // Create date exactly as it appears on Devpost - no timezone conversion
+      const date = new Date(2025, monthIndex, parseInt(day), hours, parseInt(minute), 0, 0);
       
-      // Handle day rollover if hours > 24
-      if (utcHours >= 24) {
-        finalHours = utcHours - 24;
-        finalDay = parseInt(day) + 1;
-      }
-      
-      const utcDate = new Date(Date.UTC(2025, monthIndex, finalDay, finalHours, parseInt(minute), 0, 0));
-      
-      console.log('Created UTC date:', utcDate);
-      return utcDate;
+      console.log('Created date (no conversion):', date);
+      return date;
     }
     
     throw new Error(`Could not parse date string: ${dateStr}`);
