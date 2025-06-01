@@ -12,7 +12,13 @@ interface DevpostHackathonData {
 }
 
 export class DevpostScraper {
-  private static readonly CORS_PROXY = 'https://api.allorigins.win/get?url=';
+  // List of CORS proxies to try in order
+  private static readonly CORS_PROXIES = [
+    'https://api.allorigins.win/get?url=',
+    'https://api.codetabs.com/v1/proxy?quest=',
+    'https://corsproxy.io/?',
+    'https://cors-anywhere.herokuapp.com/'
+  ];
   
   static async scrapeHackathon(devpostUrl: string): Promise<DevpostHackathonData> {
     try {
@@ -21,17 +27,42 @@ export class DevpostScraper {
         throw new Error('Please provide a valid Devpost URL');
       }
 
-      // Use CORS proxy to fetch the page
-      const proxyUrl = `${this.CORS_PROXY}${encodeURIComponent(devpostUrl)}`;
-      const response = await fetch(proxyUrl);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch hackathon page');
+      let htmlContent = '';
+      let proxyError = null;
+
+      // Try each CORS proxy in sequence until one works
+      for (const proxy of this.CORS_PROXIES) {
+        try {
+          const proxyUrl = `${proxy}${encodeURIComponent(devpostUrl)}`;
+          const response = await fetch(proxyUrl);
+          
+          if (!response.ok) {
+            continue; // Try next proxy if this one fails
+          }
+
+          // Handle different proxy response formats
+          if (proxy.includes('allorigins')) {
+            const data = await response.json();
+            htmlContent = data.contents;
+          } else {
+            htmlContent = await response.text();
+          }
+
+          if (htmlContent) {
+            break; // Successfully got content, exit loop
+          }
+        } catch (err) {
+          proxyError = err;
+          continue; // Try next proxy
+        }
       }
 
-      const data = await response.json();
-      const htmlContent = data.contents;
-      
+      if (!htmlContent) {
+        // If all proxies failed, try fallback method
+        console.warn('All CORS proxies failed, using fallback method');
+        return this.extractFromUrl(devpostUrl);
+      }
+
       // Create a DOM parser to extract information
       const parser = new DOMParser();
       const doc = parser.parseFromString(htmlContent, 'text/html');
@@ -39,7 +70,8 @@ export class DevpostScraper {
       return this.extractHackathonData(doc, devpostUrl);
     } catch (error) {
       console.error('Error scraping Devpost:', error);
-      throw error;
+      // Return basic data from URL if scraping fails
+      return this.extractFromUrl(devpostUrl);
     }
   }
 
@@ -348,8 +380,8 @@ export class DevpostScraper {
     return 'upcoming';
   }
 
-  // Fallback method for when CORS proxy fails
-  static extractFromUrl(devpostUrl: string): Partial<DevpostHackathonData> {
+  // Enhanced fallback method
+  static extractFromUrl(devpostUrl: string): DevpostHackathonData {
     const url = new URL(devpostUrl);
     const pathSegments = url.pathname.split('/').filter(Boolean);
     
@@ -362,10 +394,19 @@ export class DevpostScraper {
         .join(' ');
     }
 
+    // Set default dates
+    const now = new Date();
+    const startDate = now.toISOString();
+    const endDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days from now
+    const submissionDeadline = new Date(now.getTime() + 29 * 24 * 60 * 60 * 1000).toISOString(); // 29 days from now
+
     return {
       title,
-      organizer: 'Unknown',
-      description: 'Imported from Devpost - please update details',
+      organizer: 'Unknown Organizer',
+      description: 'Imported from Devpost - Details unavailable. Please update manually.',
+      startDate,
+      endDate,
+      submissionDeadline,
       devpostUrl,
       prizes: [],
       status: 'upcoming'
