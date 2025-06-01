@@ -184,7 +184,7 @@ const DiaryEntries: React.FC = () => {
             Last sync: {formatLastSyncTime(lastSyncTime)}
             {filteredTemporaryDrafts.length > 0 && (
               <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full text-xs">
-                {filteredTemporaryDrafts.length} new commits
+                {filteredTemporaryDrafts.length === 1 ? 'new commit' : `${filteredTemporaryDrafts.length} new commits`}
               </span>
             )}
           </p>
