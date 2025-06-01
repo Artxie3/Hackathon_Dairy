@@ -302,6 +302,79 @@
   background: var(--color-primary);
 }
 
+/* Days with Hackathon Events */
+.calendar-day.has-hackathon-events {
+  border-right: 3px solid #f59e0b;
+}
+
+.dark-theme .calendar-day.has-hackathon-events {
+  border-right-color: #f59e0b;
+}
+
+/* Hackathon Event Indicators */
+.hackathon-indicators {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.125rem;
+  margin-top: 0.25rem;
+  max-width: 100%;
+}
+
+.hackathon-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.hackathon-dot.start {
+  background: #10b981;
+}
+
+.hackathon-dot.end {
+  background: #8b5cf6;
+}
+
+.hackathon-dot.deadline {
+  background: #f59e0b;
+  animation: pulse 2s infinite;
+}
+
+.hackathon-more {
+  font-size: 0.5rem;
+  color: var(--color-gray-500);
+  font-weight: 600;
+  padding: 0.125rem 0.25rem;
+  background: var(--color-gray-200);
+  border-radius: 0.25rem;
+  line-height: 1;
+}
+
+.dark-theme .hackathon-more {
+  color: var(--color-gray-400);
+  background: var(--color-gray-700);
+}
+
+/* Pulse animation for deadlines */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Legend dots for hackathon events */
+.legend-dot.hackathon-start,
+.legend-dot.hackathon-end,
+.legend-dot.hackathon-deadline {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .calendar-container {
@@ -357,6 +430,17 @@
   .nav-button {
     width: 36px;
     height: 36px;
+  }
+
+  .hackathon-indicators,
+  .entry-indicators {
+    gap: 0.0625rem;
+  }
+
+  .hackathon-dot,
+  .entry-dot {
+    width: 4px;
+    height: 4px;
   }
 }
 

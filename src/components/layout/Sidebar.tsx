@@ -8,7 +8,8 @@ import {
   User, 
   Settings, 
   LogOut,
-  Menu
+  Menu,
+  Trophy
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import './Sidebar.css';
@@ -23,6 +24,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed }) => {
   const navItems = [
     { path: '/', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
     { path: '/diary', icon: <Book size={20} />, label: 'Diary' },
+    { path: '/hackathons', icon: <Trophy size={20} />, label: 'Hackathons' },
     { path: '/projects', icon: <Code size={20} />, label: 'Projects' },
     { path: '/analytics', icon: <BarChart2 size={20} />, label: 'Analytics' },
     { path: '/profile', icon: <User size={20} />, label: 'Profile' },

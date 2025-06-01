@@ -1,11 +1,11 @@
 import React from 'react';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { DiaryProvider } from './contexts/DiaryContext';
 import { DashboardProvider } from './contexts/DashboardContext';
-import { DevpostProvider } from './contexts/DevpostContext';
+import { HackathonProvider } from './contexts/HackathonContext';
 import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
@@ -16,6 +16,7 @@ import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Profile from './pages/Profile';
 import NotFound from './pages/NotFound';
+import Hackathons from './pages/Hackathons';
 import './App.css';
 
 function App() {
@@ -25,7 +26,7 @@ function App() {
         <NotificationProvider>
           <DiaryProvider>
             <DashboardProvider>
-              <DevpostProvider>
+              <HackathonProvider>
                 <Router>
                   <Routes>
                     <Route path="/login" element={<Login />} />
@@ -38,12 +39,13 @@ function App() {
                         <Route path="analytics" element={<Analytics />} />
                         <Route path="profile" element={<Profile />} />
                         <Route path="settings" element={<Settings />} />
+                        <Route path="hackathons" element={<Hackathons />} />
                       </Route>
                     </Route>
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </Router>
-              </DevpostProvider>
+              </HackathonProvider>
             </DashboardProvider>
           </DiaryProvider>
         </NotificationProvider>

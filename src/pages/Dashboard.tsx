@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
-import { Calendar as CalendarIcon, Clock, Github, ExternalLink, Headphones, Music, RefreshCw } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Github, ExternalLink, Headphones, Music, RefreshCw, Trophy, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useDashboard } from '../contexts/DashboardContext';
+import { useHackathons } from '../contexts/HackathonContext';
 import Calendar from '../components/Calendar';
-import HackathonDeadlines from '../components/HackathonDeadlines';
 import '../styles/Dashboard.css';
 import '../styles/Calendar.css';
-import '../styles/HackathonDeadlines.css';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const { stats, loading, error, refreshData, lastUpdated } = useDashboard();
+  const { getUpcomingDeadlines, getOngoingHackathons } = useHackathons();
   const [isRefreshing, setIsRefreshing] = useState(false);
   
+  const upcomingDeadlines = getUpcomingDeadlines();
+  const ongoingHackathons = getOngoingHackathons();
+
   // Helper function to format time
   const formatTimeAgo = (dateString: string) => {
     const now = new Date();
@@ -50,6 +53,12 @@ const Dashboard: React.FC = () => {
     console.log('Clicked date:', date);
     // You could implement navigation to diary page with date filter here
   };
+
+  // Mock data for listening history (can be extended later)
+  const listeningHistory = [
+    { id: 1, title: 'Lofi Hip Hop Mix', platform: 'YouTube', duration: '2h 15m' },
+    { id: 2, title: 'Coding Playlist', platform: 'Spotify', duration: '1h 45m' },
+  ];
   
   return (
     <div className="dashboard">
@@ -102,6 +111,30 @@ const Dashboard: React.FC = () => {
         </div>
       )}
       
+      {/* Upcoming Hackathon Deadlines Alert */}
+      {upcomingDeadlines.length > 0 && (
+        <div style={{
+          background: 'linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%)',
+          border: '1px solid #f39c12',
+          borderRadius: '0.5rem',
+          padding: '1rem',
+          marginBottom: '1rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem'
+        }}>
+          <AlertTriangle size={20} style={{ color: '#f39c12' }} />
+          <div>
+            <h3 style={{ margin: 0, fontSize: '0.875rem', fontWeight: '600', color: '#8b4513' }}>
+              Upcoming Hackathon Deadlines
+            </h3>
+            <p style={{ margin: 0, fontSize: '0.75rem', color: '#8b4513' }}>
+              {upcomingDeadlines.length} deadline{upcomingDeadlines.length > 1 ? 's' : ''} in the next 7 days
+            </p>
+          </div>
+        </div>
+      )}
+      
       <div className="dashboard-grid">
         {/* Stats Overview */}
         <div className="dashboard-card stats-card">
@@ -128,22 +161,22 @@ const Dashboard: React.FC = () => {
             </div>
             
             <div className="stat-item">
+              <div className="stat-icon hackathons" style={{ backgroundColor: '#f59e0b' }}>
+                <Trophy size={20} />
+              </div>
+              <div className="stat-info">
+                <h3>Active Hackathons</h3>
+                <p className="stat-value">{loading ? '...' : ongoingHackathons.length}</p>
+              </div>
+            </div>
+            
+            <div className="stat-item">
               <div className="stat-icon listened">
                 <Headphones size={20} />
               </div>
               <div className="stat-info">
                 <h3>Listened</h3>
                 <p className="stat-value">{loading ? '...' : '3h 40m'}</p>
-              </div>
-            </div>
-            
-            <div className="stat-item">
-              <div className="stat-icon mood">
-                <span className="mood-emoji">😊</span>
-              </div>
-              <div className="stat-info">
-                <h3>Mood</h3>
-                <p className="stat-value">Productive</p>
               </div>
             </div>
           </div>
@@ -182,11 +215,6 @@ const Dashboard: React.FC = () => {
             )}
           </ul>
         </div>
-
-        {/* Hackathon Deadlines */}
-        <div className="dashboard-card hackathon-card">
-          <HackathonDeadlines />
-        </div>
         
         {/* Calendar Widget */}
         <div className="dashboard-card calendar-card">
@@ -196,6 +224,33 @@ const Dashboard: React.FC = () => {
           </div>
           <div style={{ marginTop: '1rem' }}>
             <Calendar onDateClick={handleDateClick} />
+          </div>
+        </div>
+        
+        {/* Listening History */}
+        <div className="dashboard-card listening-card">
+          <div className="card-header">
+            <h2>Listening While Coding</h2>
+            <Music size={18} />
+          </div>
+          <div className="listening-list">
+            {listeningHistory.map(item => (
+              <div key={item.id} className="listening-item">
+                <div className="listening-icon">
+                  {item.platform === 'YouTube' ? 
+                    <ExternalLink size={16} /> : 
+                    <Music size={16} />
+                  }
+                </div>
+                <div className="listening-info">
+                  <h3>{item.title}</h3>
+                  <div className="listening-meta">
+                    <span className="listening-platform">{item.platform}</span>
+                    <span className="listening-duration">{item.duration}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>

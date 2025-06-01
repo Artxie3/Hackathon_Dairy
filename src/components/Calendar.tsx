@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useDiary } from '../contexts/DiaryContext';
+import { useHackathons } from '../contexts/HackathonContext';
 
 interface CalendarProps {
   onDateClick?: (date: Date) => void;
@@ -14,10 +15,17 @@ interface CalendarDay {
   hasEntries: boolean;
   entriesCount: number;
   isWeekend: boolean;
+  hasHackathonEvents: boolean;
+  hackathonEvents: Array<{
+    type: 'start' | 'end' | 'deadline';
+    title: string;
+    color: string;
+  }>;
 }
 
 const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
   const { entries, temporaryDrafts } = useDiary();
+  const { hackathons } = useHackathons();
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -63,12 +71,54 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
       const dateKey = draftDate.toDateString();
       entriesMap.set(dateKey, (entriesMap.get(dateKey) || 0) + 1);
     });
+
+    // Create hackathon events map
+    const hackathonEventsMap = new Map<string, Array<{ type: 'start' | 'end' | 'deadline'; title: string; color: string; }>>();
+    
+    hackathons.forEach(hackathon => {
+      // Start date
+      const startDate = new Date(hackathon.startDate);
+      const startKey = startDate.toDateString();
+      if (!hackathonEventsMap.has(startKey)) {
+        hackathonEventsMap.set(startKey, []);
+      }
+      hackathonEventsMap.get(startKey)!.push({
+        type: 'start',
+        title: hackathon.title,
+        color: '#10b981' // green
+      });
+
+      // End date
+      const endDate = new Date(hackathon.endDate);
+      const endKey = endDate.toDateString();
+      if (!hackathonEventsMap.has(endKey)) {
+        hackathonEventsMap.set(endKey, []);
+      }
+      hackathonEventsMap.get(endKey)!.push({
+        type: 'end',
+        title: hackathon.title,
+        color: '#8b5cf6' // purple
+      });
+
+      // Deadline date
+      const deadlineDate = new Date(hackathon.submissionDeadline);
+      const deadlineKey = deadlineDate.toDateString();
+      if (!hackathonEventsMap.has(deadlineKey)) {
+        hackathonEventsMap.set(deadlineKey, []);
+      }
+      hackathonEventsMap.get(deadlineKey)!.push({
+        type: 'deadline',
+        title: hackathon.title,
+        color: '#f59e0b' // amber
+      });
+    });
     
     // Generate all days for the calendar grid
     const current = new Date(startDate);
     while (current <= endDate) {
       const dateKey = current.toDateString();
       const entriesCount = entriesMap.get(dateKey) || 0;
+      const hackathonEvents = hackathonEventsMap.get(dateKey) || [];
       
       days.push({
         date: new Date(current),
@@ -77,13 +127,15 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
         hasEntries: entriesCount > 0,
         entriesCount,
         isWeekend: current.getDay() === 0 || current.getDay() === 6,
+        hasHackathonEvents: hackathonEvents.length > 0,
+        hackathonEvents,
       });
       
       current.setDate(current.getDate() + 1);
     }
     
     return days;
-  }, [currentDate, entries, temporaryDrafts]);
+  }, [currentDate, entries, temporaryDrafts, hackathons]);
 
   const navigateMonth = (direction: 'prev' | 'next') => {
     setCurrentDate(prev => {
@@ -162,12 +214,14 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
             } ${
               day.hasEntries ? 'has-entries' : ''
             } ${
+              day.hasHackathonEvents ? 'has-hackathon-events' : ''
+            } ${
               day.isWeekend ? 'weekend' : ''
             }`}
             onClick={() => handleDateClick(day)}
             title={
-              day.hasEntries 
-                ? `${day.entriesCount} ${day.entriesCount === 1 ? 'entry' : 'entries'} - ${day.date.toLocaleDateString()}`
+              day.hasEntries || day.hasHackathonEvents
+                ? `${day.hasEntries ? `${day.entriesCount} ${day.entriesCount === 1 ? 'entry' : 'entries'}` : ''}${day.hasEntries && day.hasHackathonEvents ? ', ' : ''}${day.hasHackathonEvents ? day.hackathonEvents.map(e => `${e.title} (${e.type})`).join(', ') : ''} - ${day.date.toLocaleDateString()}`
                 : day.date.toLocaleDateString()
             }
           >
@@ -191,6 +245,23 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
                 )}
               </div>
             )}
+
+            {/* Hackathon event indicators */}
+            {day.hasHackathonEvents && (
+              <div className="hackathon-indicators">
+                {day.hackathonEvents.slice(0, 3).map((event, i) => (
+                  <div 
+                    key={i} 
+                    className={`hackathon-dot ${event.type}`}
+                    style={{ backgroundColor: event.color }}
+                    title={`${event.title} - ${event.type}`}
+                  />
+                ))}
+                {day.hackathonEvents.length > 3 && (
+                  <div className="hackathon-more">+{day.hackathonEvents.length - 3}</div>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -204,6 +275,18 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
         <div className="legend-item">
           <div className="legend-dot today"></div>
           <span>Today</span>
+        </div>
+        <div className="legend-item">
+          <div className="legend-dot hackathon-start" style={{ backgroundColor: '#10b981' }}></div>
+          <span>Hackathon starts</span>
+        </div>
+        <div className="legend-item">
+          <div className="legend-dot hackathon-deadline" style={{ backgroundColor: '#f59e0b' }}></div>
+          <span>Submission deadline</span>
+        </div>
+        <div className="legend-item">
+          <div className="legend-dot hackathon-end" style={{ backgroundColor: '#8b5cf6' }}></div>
+          <span>Hackathon ends</span>
         </div>
       </div>
     </div>
