@@ -1,233 +1,283 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Github, ExternalLink, Headphones, Music, GitCommit, SmilePlus } from 'lucide-react';
+import React, { useState } from 'react';
+import { Calendar, Clock, Github, ExternalLink, Headphones, Music, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useDashboard } from '../contexts/DashboardContext';
 import '../styles/Dashboard.css';
-import ActivityCalendar from '../components/ActivityCalendar';
-
-interface GitHubCommit {
-  sha: string;
-  repo: string;
-  message: string;
-  timestamp: string;
-}
-
-interface DailyStats {
-  commits: number;
-  codingTime: string;
-  listenedTime: string;
-  mood: string;
-}
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
-  const [recentCommits, setRecentCommits] = useState<GitHubCommit[]>([]);
-  const [todayStats, setTodayStats] = useState<DailyStats>({
-    commits: 0,
-    codingTime: '0h 0m',
-    listenedTime: '0h 0m',
-    mood: 'Productive'
-  });
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { stats, loading, error, refreshData, lastUpdated } = useDashboard();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Helper function to format time
+  const formatTimeAgo = (dateString: string) => {
+    const now = new Date();
+    const commitDate = new Date(dateString);
+    const diffInMs = now.getTime() - commitDate.getTime();
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+    const diffInDays = Math.floor(diffInHours / 24);
 
-  useEffect(() => {
-    const fetchGitHubData = async () => {
-      if (!user?.username) return;
-
-      try {
-        setIsLoading(true);
-        const token = localStorage.getItem('github_token');
-        if (!token) {
-          throw new Error('GitHub token not found');
-        }
-
-        // Fetch user's events from GitHub
-        const eventsResponse = await fetch(
-          `https://api.github.com/users/${user.username}/events?per_page=30`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              Accept: 'application/vnd.github.v3+json',
-            },
-          }
-        );
-
-        if (!eventsResponse.ok) {
-          throw new Error('Failed to fetch GitHub events');
-        }
-
-        const events = await eventsResponse.json();
-        
-        // Process push events to get commits
-        const today = new Date().toDateString();
-        let todayCommitsCount = 0;
-        const processedCommits: GitHubCommit[] = [];
-
-        events.forEach((event: any) => {
-          if (event.type === 'PushEvent') {
-            const eventDate = new Date(event.created_at).toDateString();
-            if (eventDate === today) {
-              todayCommitsCount += event.payload.commits?.length || 0;
-            }
-
-            event.payload.commits?.forEach((commit: any) => {
-              processedCommits.push({
-                sha: commit.sha,
-                repo: event.repo.name,
-                message: commit.message,
-                timestamp: event.created_at
-              });
-            });
-          }
-        });
-
-        // Update state with processed data
-        setRecentCommits(processedCommits.slice(0, 5)); // Keep only 5 most recent commits
-        setTodayStats(prev => ({
-          ...prev,
-          commits: todayCommitsCount
-        }));
-
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching GitHub data:', err);
-        setError('Failed to load GitHub data');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchGitHubData();
-    // Refresh data every 5 minutes
-    const interval = setInterval(fetchGitHubData, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [user?.username]);
-
-  const formatTimeAgo = (timestamp: string) => {
-    const diff = Date.now() - new Date(timestamp).getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`;
-    if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
-    if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
-    return 'just now';
+    if (diffInHours < 1) {
+      const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+      return `${diffInMinutes}m ago`;
+    } else if (diffInHours < 24) {
+      return `${diffInHours}h ago`;
+    } else if (diffInDays === 1) {
+      return '1 day ago';
+    } else {
+      return `${diffInDays} days ago`;
+    }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
+  // Helper function to extract repository name
+  const getRepoName = (fullName: string) => {
+    return fullName.split('/').pop() || fullName;
+  };
 
+  // Generate calendar heatmap data
+  const generateCalendarData = () => {
+    const today = new Date();
+    const days = [];
+    
+    // Generate last 30 days
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      const dateKey = date.toISOString().split('T')[0];
+      const commits = stats.commitActivity[dateKey] || 0;
+      
+      let level = '';
+      if (commits > 0) {
+        if (commits === 1) level = 'level-1';
+        else if (commits === 2) level = 'level-2';
+        else if (commits === 3) level = 'level-3';
+        else level = 'level-4';
+      }
+      
+      days.push({
+        date: dateKey,
+        commits,
+        level,
+        displayDate: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      });
+    }
+    
+    return days;
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refreshData();
+    setIsRefreshing(false);
+  };
+
+  // Mock data for listening history (can be extended later)
+  const listeningHistory = [
+    { id: 1, title: 'Lofi Hip Hop Mix', platform: 'YouTube', duration: '2h 15m' },
+    { id: 2, title: 'Coding Playlist', platform: 'Spotify', duration: '1h 45m' },
+  ];
+
+  const calendarDays = generateCalendarData();
+  
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-        Welcome back, {user?.username || 'Developer'}
-      </h1>
-      <p className="text-gray-500 dark:text-gray-400 mb-8">
-        {new Date().toLocaleDateString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        })}
-      </p>
-
-      {/* Today's Stats */}
-      <div className="bg-gray-800 rounded-lg p-6 mb-8">
-        <h2 className="text-xl font-semibold text-white mb-6">Today's Stats</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-gray-700/50 rounded-lg p-4 flex items-center">
-            <div className="bg-indigo-500/20 p-3 rounded-lg mr-4">
-              <Clock className="h-6 w-6 text-indigo-500" />
-            </div>
-            <div>
-              <p className="text-gray-400 text-sm">Coding Time</p>
-              <p className="text-white text-xl font-semibold">{todayStats.codingTime}</p>
-            </div>
+    <div className="dashboard">
+      <header className="dashboard-header">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h1>Welcome back, {user?.name || 'Developer'}</h1>
+            <p className="dashboard-date">
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              {lastUpdated && (
+                <span style={{ marginLeft: '1rem', fontSize: '0.75rem', opacity: 0.7 }}>
+                  Last updated: {lastUpdated.toLocaleTimeString()}
+                </span>
+              )}
+            </p>
           </div>
-
-          <div className="bg-gray-700/50 rounded-lg p-4 flex items-center">
-            <div className="bg-indigo-500/20 p-3 rounded-lg mr-4">
-              <GitCommit className="h-6 w-6 text-indigo-500" />
-            </div>
-            <div>
-              <p className="text-gray-400 text-sm">Commits</p>
-              <p className="text-white text-xl font-semibold">{todayStats.commits}</p>
-            </div>
-          </div>
-
-          <div className="bg-gray-700/50 rounded-lg p-4 flex items-center">
-            <div className="bg-indigo-500/20 p-3 rounded-lg mr-4">
-              <Headphones className="h-6 w-6 text-indigo-500" />
-            </div>
-            <div>
-              <p className="text-gray-400 text-sm">Listened</p>
-              <p className="text-white text-xl font-semibold">{todayStats.listenedTime}</p>
-            </div>
-          </div>
-
-          <div className="bg-gray-700/50 rounded-lg p-4 flex items-center">
-            <div className="bg-indigo-500/20 p-3 rounded-lg mr-4">
-              <SmilePlus className="h-6 w-6 text-indigo-500" />
-            </div>
-            <div>
-              <p className="text-gray-400 text-sm">Mood</p>
-              <p className="text-white text-xl font-semibold">{todayStats.mood}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Commits */}
-      <div className="bg-gray-800 rounded-lg p-6 mb-8">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold text-white">Recent Commits</h2>
-          <a
-            href={`https://github.com/${user?.username}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-indigo-400 hover:text-indigo-300 text-sm"
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing || loading}
+            style={{
+              background: 'var(--color-primary)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '0.5rem',
+              padding: '0.5rem 1rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontSize: '0.875rem',
+              opacity: isRefreshing ? 0.7 : 1,
+            }}
           >
-            View all
-          </a>
+            <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
         </div>
-        <div className="space-y-4">
-          {recentCommits.map(commit => (
-            <div key={commit.sha} className="bg-gray-700/50 rounded-lg p-4">
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="text-white font-medium">{commit.message.split('\n')[0]}</h3>
-                <span className="text-gray-400 text-sm">{formatTimeAgo(commit.timestamp)}</span>
+      </header>
+      
+      {error && (
+        <div style={{
+          background: '#fee2e2',
+          color: '#dc2626',
+          padding: '1rem',
+          borderRadius: '0.5rem',
+          marginBottom: '1rem',
+          fontSize: '0.875rem'
+        }}>
+          {error}
+        </div>
+      )}
+      
+      <div className="dashboard-grid">
+        {/* Stats Overview */}
+        <div className="dashboard-card stats-card">
+          <h2>Today's Stats</h2>
+          <div className="stats-grid">
+            <div className="stat-item">
+              <div className="stat-icon coding-time">
+                <Clock size={20} />
               </div>
-              <p className="text-gray-400 text-sm">{commit.repo}</p>
+              <div className="stat-info">
+                <h3>Coding Time</h3>
+                <p className="stat-value">{loading ? '...' : '4h 25m'}</p>
+              </div>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Calendar */}
-      <div className="bg-gray-800 rounded-lg p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold text-white">Activity Calendar</h2>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1">
-              <span className="text-gray-400 text-sm">Less</span>
-              <div className="flex gap-1">
-                <div className="w-3 h-3 rounded-sm bg-gray-700/50"></div>
-                <div className="w-3 h-3 rounded-sm bg-indigo-900/40"></div>
-                <div className="w-3 h-3 rounded-sm bg-indigo-700/60"></div>
-                <div className="w-3 h-3 rounded-sm bg-indigo-500/80"></div>
-                <div className="w-3 h-3 rounded-sm bg-indigo-400"></div>
+            
+            <div className="stat-item">
+              <div className="stat-icon commits">
+                <Github size={20} />
               </div>
-              <span className="text-gray-400 text-sm">More</span>
+              <div className="stat-info">
+                <h3>Commits</h3>
+                <p className="stat-value">{loading ? '...' : stats.todaysCommits}</p>
+              </div>
+            </div>
+            
+            <div className="stat-item">
+              <div className="stat-icon listened">
+                <Headphones size={20} />
+              </div>
+              <div className="stat-info">
+                <h3>Listened</h3>
+                <p className="stat-value">{loading ? '...' : '3h 40m'}</p>
+              </div>
+            </div>
+            
+            <div className="stat-item">
+              <div className="stat-icon mood">
+                <span className="mood-emoji">😊</span>
+              </div>
+              <div className="stat-info">
+                <h3>Mood</h3>
+                <p className="stat-value">Productive</p>
+              </div>
             </div>
           </div>
         </div>
-        <ActivityCalendar className="h-64" />
+        
+        {/* Recent Activity */}
+        <div className="dashboard-card recent-commits-card">
+          <div className="card-header">
+            <h2>Recent Commits</h2>
+            <a href="/diary" className="view-all">View all</a>
+          </div>
+          <ul className="commits-list">
+            {loading ? (
+              <li className="commit-item">
+                <div className="commit-info">
+                  <p className="commit-message">Loading...</p>
+                </div>
+              </li>
+            ) : stats.recentCommits.length === 0 ? (
+              <li className="commit-item">
+                <div className="commit-info">
+                  <p className="commit-message">No recent commits</p>
+                  <p className="commit-repo">Start coding to see activity here!</p>
+                </div>
+              </li>
+            ) : (
+              stats.recentCommits.slice(0, 6).map(commit => (
+                <li key={commit.sha} className="commit-item">
+                  <div className="commit-info">
+                    <p className="commit-message">{commit.message}</p>
+                    <p className="commit-repo">{getRepoName(commit.repo)}</p>
+                  </div>
+                  <span className="commit-time">{formatTimeAgo(commit.date)}</span>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+        
+        {/* Calendar Widget */}
+        <div className="dashboard-card calendar-card">
+          <div className="card-header">
+            <h2>Commit Activity (Last 30 Days)</h2>
+            <Calendar size={18} />
+          </div>
+          <div className="calendar-heatmap">
+            <div className="heatmap-grid">
+              {calendarDays.map((day, index) => (
+                <div 
+                  key={index} 
+                  className={`heatmap-cell ${day.level}`}
+                  title={`${day.displayDate}: ${day.commits} commits`}
+                  style={{ position: 'relative' }}
+                ></div>
+              ))}
+            </div>
+            <div style={{ 
+              marginTop: '1rem', 
+              fontSize: '0.75rem', 
+              color: 'var(--color-gray-500)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <span>
+                Weekly: {stats.weeklyCommits} | Monthly: {stats.monthlyCommits}
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <span>Less</span>
+                <div className="heatmap-cell" style={{ width: '10px', height: '10px' }}></div>
+                <div className="heatmap-cell level-1" style={{ width: '10px', height: '10px' }}></div>
+                <div className="heatmap-cell level-2" style={{ width: '10px', height: '10px' }}></div>
+                <div className="heatmap-cell level-3" style={{ width: '10px', height: '10px' }}></div>
+                <div className="heatmap-cell level-4" style={{ width: '10px', height: '10px' }}></div>
+                <span>More</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Listening History */}
+        <div className="dashboard-card listening-card">
+          <div className="card-header">
+            <h2>Listening While Coding</h2>
+            <Music size={18} />
+          </div>
+          <div className="listening-list">
+            {listeningHistory.map(item => (
+              <div key={item.id} className="listening-item">
+                <div className="listening-icon">
+                  {item.platform === 'YouTube' ? 
+                    <ExternalLink size={16} /> : 
+                    <Music size={16} />
+                  }
+                </div>
+                <div className="listening-info">
+                  <h3>{item.title}</h3>
+                  <div className="listening-meta">
+                    <span className="listening-platform">{item.platform}</span>
+                    <span className="listening-duration">{item.duration}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
