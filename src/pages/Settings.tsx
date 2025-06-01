@@ -1,182 +1,374 @@
-import React, { useState } from 'react';
-import { Clock, Globe, Save, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { GitBranch, RefreshCw, Save, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { useDiary } from '../contexts/DiaryContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 
 const Settings: React.FC = () => {
-  const { timezone, darkMode, updateSettings } = useSettings();
-  const [tempSettings, setTempSettings] = useState({
-    timezone,
-    darkMode,
-  });
-  const [saved, setSaved] = useState(false);
+  const { syncGitHubCommits, isSyncing, lastSyncTime } = useDiary();
+  const { user } = useAuth();
+  const { timezone, updateSettings } = useSettings();
+  const [localTimezone, setLocalTimezone] = useState(timezone);
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
+  const [syncInterval, setSyncInterval] = useState(10); // minutes
+  const [excludedRepos, setExcludedRepos] = useState<string[]>([]);
+  const [newExcludedRepo, setNewExcludedRepo] = useState('');
+  const [emailNotifications, setEmailNotifications] = useState(false);
+  const [desktopNotifications, setDesktopNotifications] = useState(false);
+  const [theme, setTheme] = useState('system');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
-  const timezones = [
-    { value: 'GMT-12', label: 'GMT-12 (Baker Island)' },
-    { value: 'GMT-11', label: 'GMT-11 (American Samoa)' },
-    { value: 'GMT-10', label: 'GMT-10 (Hawaii)' },
-    { value: 'GMT-9', label: 'GMT-9 (Alaska)' },
-    { value: 'GMT-8', label: 'GMT-8 (Pacific Time)' },
-    { value: 'GMT-7', label: 'GMT-7 (Mountain Time)' },
-    { value: 'GMT-6', label: 'GMT-6 (Central Time)' },
-    { value: 'GMT-5', label: 'GMT-5 (Eastern Time) - Hackathon Default', important: true },
-    { value: 'GMT-4', label: 'GMT-4 (Atlantic Time)' },
-    { value: 'GMT-3', label: 'GMT-3 (Brazil)' },
-    { value: 'GMT-2', label: 'GMT-2 (South Georgia)' },
-    { value: 'GMT-1', label: 'GMT-1 (Azores)' },
-    { value: 'GMT+0', label: 'GMT+0 (London, Dublin)' },
-    { value: 'GMT+1', label: 'GMT+1 (Berlin, Paris, Rome)' },
-    { value: 'GMT+2', label: 'GMT+2 (Cairo, Helsinki)' },
-    { value: 'GMT+3', label: 'GMT+3 (Moscow, Istanbul)' },
-    { value: 'GMT+4', label: 'GMT+4 (Dubai, Baku)' },
-    { value: 'GMT+5', label: 'GMT+5 (Karachi, Tashkent)' },
-    { value: 'GMT+5:30', label: 'GMT+5:30 (India, Sri Lanka)' },
-    { value: 'GMT+6', label: 'GMT+6 (Dhaka, Almaty)' },
-    { value: 'GMT+7', label: 'GMT+7 (Bangkok, Jakarta)' },
-    { value: 'GMT+8', label: 'GMT+8 (Beijing, Singapore)' },
-    { value: 'GMT+9', label: 'GMT+9 (Tokyo, Seoul)' },
-    { value: 'GMT+10', label: 'GMT+10 (Sydney, Melbourne)' },
-    { value: 'GMT+11', label: 'GMT+11 (Noumea, Solomon Islands)' },
-    { value: 'GMT+12', label: 'GMT+12 (Fiji, New Zealand)' },
-  ];
+  // Load settings from localStorage
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('diary-settings');
+    if (savedSettings) {
+      try {
+        const settings = JSON.parse(savedSettings);
+        setAutoSyncEnabled(settings.autoSyncEnabled ?? true);
+        setSyncInterval(settings.syncInterval ?? 10);
+        setExcludedRepos(settings.excludedRepos ?? []);
+        setEmailNotifications(settings.emailNotifications ?? false);
+        setDesktopNotifications(settings.desktopNotifications ?? false);
+        setTheme(settings.theme ?? 'system');
+      } catch (error) {
+        console.error('Error loading settings:', error);
+      }
+    }
+  }, []);
 
-  const handleSave = () => {
-    updateSettings(tempSettings);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  const handleSaveSettings = async () => {
+    setSaveStatus('saving');
+    
+    const settings = {
+      autoSyncEnabled,
+      syncInterval,
+      excludedRepos,
+      emailNotifications,
+      desktopNotifications,
+      theme,
+    };
+
+    try {
+      localStorage.setItem('diary-settings', JSON.stringify(settings));
+      
+      // Update timezone settings
+      updateSettings({ timezone: localTimezone });
+      
+      setSaveStatus('saved');
+      
+      // Apply theme immediately
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else if (theme === 'light') {
+        document.documentElement.classList.remove('dark');
+      } else {
+        // System theme
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (prefersDark) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      }
+
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    }
   };
 
-  const getCurrentTime = (tz: string) => {
-    const now = new Date();
-    const offset = parseFloat(tz.replace('GMT', ''));
-    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-    const targetTime = new Date(utc + (offset * 3600000));
-    return targetTime.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
+  const handleAddExcludedRepo = () => {
+    if (newExcludedRepo.trim() && !excludedRepos.includes(newExcludedRepo.trim())) {
+      setExcludedRepos([...excludedRepos, newExcludedRepo.trim()]);
+      setNewExcludedRepo('');
+    }
+  };
+
+  const handleRemoveExcludedRepo = (repo: string) => {
+    setExcludedRepos(excludedRepos.filter(r => r !== repo));
+  };
+
+  const formatLastSyncTime = (time: Date | null) => {
+    if (!time) return 'Never';
+    return time.toLocaleString();
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Settings</h1>
-        
-        {/* Timezone Section */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <Globe className="text-blue-500" size={20} />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Timezone Configuration</h2>
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <h1 className="text-3xl font-bold mb-8 text-gray-900 dark:text-white">Settings</h1>
+      
+      <div className="space-y-8">
+        {/* Timezone Settings */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <Clock className="text-blue-600 dark:text-blue-400" size={24} />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Timezone Settings</h2>
           </div>
           
-          {/* Timezone Warning */}
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-4">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="text-amber-600 dark:text-amber-400 mt-0.5" size={16} />
-              <div>
-                <h3 className="font-medium text-amber-800 dark:text-amber-200 mb-1">
-                  Important: Hackathon Deadlines
-                </h3>
-                <p className="text-amber-700 dark:text-amber-300 text-sm">
-                  Most hackathons use GMT-5 (Eastern Time) for their deadlines. Setting your correct timezone 
-                  ensures you see accurate deadline times and don't miss submissions.
-                </p>
+          <div className="space-y-4">
+            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" size={20} />
+                <div>
+                  <h3 className="font-medium text-yellow-800 dark:text-yellow-300 mb-1">Important Notice</h3>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                    Hackathon deadlines are displayed in GMT-5 timezone. Setting your local timezone helps you see equivalent times but doesn't change the actual deadlines.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Your Timezone
               </label>
               <select
-                value={tempSettings.timezone}
-                onChange={(e) => setTempSettings({ ...tempSettings, timezone: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md 
-                         bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                         focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                value={localTimezone}
+                onChange={(e) => setLocalTimezone(e.target.value)}
+                className="form-select block w-full max-w-md px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-blue-500 focus:border-blue-500"
               >
-                {timezones.map((tz) => (
-                  <option key={tz.value} value={tz.value} className={tz.important ? 'font-bold' : ''}>
-                    {tz.label}
-                  </option>
-                ))}
+                <option value="GMT-12">GMT-12 (Baker Island)</option>
+                <option value="GMT-11">GMT-11 (Samoa)</option>
+                <option value="GMT-10">GMT-10 (Hawaii)</option>
+                <option value="GMT-9">GMT-9 (Alaska)</option>
+                <option value="GMT-8">GMT-8 (Pacific Time)</option>
+                <option value="GMT-7">GMT-7 (Mountain Time)</option>
+                <option value="GMT-6">GMT-6 (Central Time)</option>
+                <option value="GMT-5">GMT-5 (Eastern Time / Hackathon Time)</option>
+                <option value="GMT-4">GMT-4 (Atlantic Time)</option>
+                <option value="GMT-3">GMT-3 (Brazil)</option>
+                <option value="GMT-2">GMT-2 (Mid-Atlantic)</option>
+                <option value="GMT-1">GMT-1 (Azores)</option>
+                <option value="GMT+0">GMT+0 (London, Dublin)</option>
+                <option value="GMT+1">GMT+1 (Central Europe)</option>
+                <option value="GMT+2">GMT+2 (Eastern Europe)</option>
+                <option value="GMT+3">GMT+3 (Moscow, Istanbul)</option>
+                <option value="GMT+4">GMT+4 (Dubai, Baku)</option>
+                <option value="GMT+5">GMT+5 (Pakistan, Uzbekistan)</option>
+                <option value="GMT+5:30">GMT+5:30 (India, Sri Lanka)</option>
+                <option value="GMT+6">GMT+6 (Bangladesh, Kazakhstan)</option>
+                <option value="GMT+7">GMT+7 (Thailand, Vietnam)</option>
+                <option value="GMT+8">GMT+8 (China, Singapore)</option>
+                <option value="GMT+9">GMT+9 (Japan, Korea)</option>
+                <option value="GMT+10">GMT+10 (Australia East)</option>
+                <option value="GMT+11">GMT+11 (Solomon Islands)</option>
+                <option value="GMT+12">GMT+12 (New Zealand)</option>
               </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Current Time in Your Timezone
-              </label>
-              <div className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 
-                            rounded-md text-gray-900 dark:text-white font-mono">
-                <div className="flex items-center gap-2">
-                  <Clock size={16} />
-                  {getCurrentTime(tempSettings.timezone)}
+              
+              {localTimezone !== 'GMT-5' && (
+                <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    <strong>Time difference:</strong> Your timezone is {getTimeDifference(localTimezone)} from hackathon time (GMT-5).
+                  </p>
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* GitHub Integration */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <GitBranch className="text-green-600 dark:text-green-400" size={24} />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">GitHub Integration</h2>
+          </div>
+          
+          <div className="space-y-6">
+            {/* Sync Status */}
+            <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <h3 className="font-medium text-gray-900 dark:text-white mb-2">Sync Status</h3>
+              <div className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
+                <p><strong>Connected Account:</strong> {user?.username || 'Not connected'}</p>
+                <p><strong>Last Sync:</strong> {formatLastSyncTime(lastSyncTime)}</p>
+                <button
+                  onClick={syncGitHubCommits}
+                  disabled={isSyncing}
+                  className="flex items-center gap-2 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isSyncing ? (
+                    <RefreshCw className="animate-spin" size={16} />
+                  ) : (
+                    <GitBranch size={16} />
+                  )}
+                  {isSyncing ? 'Syncing...' : 'Sync Now'}
+                </button>
+              </div>
+            </div>
+
+            {/* Auto-sync Settings */}
+            <div>
+              <h3 className="font-medium text-gray-900 dark:text-white mb-4">Auto-sync Configuration</h3>
+              <div className="space-y-4">
+                <label className="flex items-center space-x-3">
+                  <input 
+                    type="checkbox" 
+                    checked={autoSyncEnabled}
+                    onChange={(e) => setAutoSyncEnabled(e.target.checked)}
+                    className="form-checkbox h-4 w-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
+                  />
+                  <span className="text-gray-700 dark:text-gray-300">Enable automatic sync</span>
+                </label>
+                
+                {autoSyncEnabled && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Sync Interval
+                    </label>
+                    <select 
+                      value={syncInterval}
+                      onChange={(e) => setSyncInterval(Number(e.target.value))}
+                      className="form-select block w-full max-w-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-green-500 focus:border-green-500"
+                    >
+                      <option value={5}>Every 5 minutes</option>
+                      <option value={10}>Every 10 minutes</option>
+                      <option value={15}>Every 15 minutes</option>
+                      <option value={30}>Every 30 minutes</option>
+                      <option value={60}>Every hour</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Repository Exclusions */}
+            <div>
+              <h3 className="font-medium text-gray-900 dark:text-white mb-4">Repository Exclusions</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Exclude specific repositories from automatic diary entry creation.
+              </p>
+              
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newExcludedRepo}
+                    onChange={(e) => setNewExcludedRepo(e.target.value)}
+                    placeholder="owner/repository-name"
+                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-green-500 focus:border-green-500"
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddExcludedRepo()}
+                  />
+                  <button
+                    onClick={handleAddExcludedRepo}
+                    className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                  >
+                    Add
+                  </button>
+                </div>
+                
+                {excludedRepos.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Excluded repositories:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {excludedRepos.map(repo => (
+                        <span
+                          key={repo}
+                          className="inline-flex items-center gap-2 px-3 py-1 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full text-sm"
+                        >
+                          {repo}
+                          <button
+                            onClick={() => handleRemoveExcludedRepo(repo)}
+                            className="hover:text-red-900 dark:hover:text-red-100"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-
-          {/* Time Comparison */}
-          {tempSettings.timezone !== 'GMT-5' && (
-            <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <h4 className="font-medium text-blue-900 dark:text-blue-200 mb-2">Time Comparison</h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-blue-700 dark:text-blue-300">Your Time ({tempSettings.timezone}):</span>
-                  <div className="font-mono font-bold">{getCurrentTime(tempSettings.timezone)}</div>
-                </div>
-                <div>
-                  <span className="text-blue-700 dark:text-blue-300">Hackathon Time (GMT-5):</span>
-                  <div className="font-mono font-bold">{getCurrentTime('GMT-5')}</div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Theme Section */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Appearance</h2>
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="darkMode"
-              checked={tempSettings.darkMode}
-              onChange={(e) => setTempSettings({ ...tempSettings, darkMode: e.target.checked })}
-              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded 
-                       focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 
-                       focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-            />
-            <label htmlFor="darkMode" className="ml-2 text-sm font-medium text-gray-900 dark:text-white">
-              Enable Dark Mode
-            </label>
+        {/* Application Settings */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+          <h2 className="text-xl font-semibold mb-6 text-gray-900 dark:text-white">Application Settings</h2>
+          <div className="space-y-6">
+            <div>
+              <h3 className="font-medium text-gray-900 dark:text-white mb-4">Notifications</h3>
+              <div className="space-y-4">
+                <label className="flex items-center space-x-3">
+                  <input 
+                    type="checkbox" 
+                    checked={emailNotifications}
+                    onChange={(e) => setEmailNotifications(e.target.checked)}
+                    className="form-checkbox h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                  />
+                  <span className="text-gray-700 dark:text-gray-300">Enable email notifications</span>
+                </label>
+                <label className="flex items-center space-x-3">
+                  <input 
+                    type="checkbox" 
+                    checked={desktopNotifications}
+                    onChange={(e) => setDesktopNotifications(e.target.checked)}
+                    className="form-checkbox h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                  />
+                  <span className="text-gray-700 dark:text-gray-300">Enable desktop notifications</span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="font-medium text-gray-900 dark:text-white mb-4">Theme Preferences</h3>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Theme Mode</label>
+                <select 
+                  value={theme}
+                  onChange={(e) => setTheme(e.target.value)}
+                  className="form-select block w-full max-w-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="light">Light</option>
+                  <option value="dark">Dark</option>
+                  <option value="system">System</option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Save Button */}
-        <div className="flex items-center gap-4">
-          <button
-            onClick={handleSave}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 
-                     text-white rounded-md transition-colors focus:ring-2 focus:ring-blue-500 
-                     focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+        <div className="flex justify-end">
+          <button 
+            onClick={handleSaveSettings}
+            disabled={saveStatus === 'saving'}
+            className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            <Save size={16} />
-            Save Settings
+            {saveStatus === 'saving' ? (
+              <RefreshCw className="animate-spin" size={20} />
+            ) : saveStatus === 'saved' ? (
+              <CheckCircle size={20} />
+            ) : saveStatus === 'error' ? (
+              <AlertCircle size={20} />
+            ) : (
+              <Save size={20} />
+            )}
+            {saveStatus === 'saving' ? 'Saving...' : 
+             saveStatus === 'saved' ? 'Saved!' : 
+             saveStatus === 'error' ? 'Error!' : 
+             'Save Changes'}
           </button>
-          
-          {saved && (
-            <span className="text-green-600 dark:text-green-400 text-sm font-medium">
-              ✓ Settings saved successfully!
-            </span>
-          )}
         </div>
       </div>
     </div>
   );
+};
+
+// Helper function to calculate time difference
+const getTimeDifference = (userTimezone: string): string => {
+  const hackathonOffset = -5; // GMT-5
+  const userOffset = parseInt(userTimezone.replace('GMT', '').replace('+', ''));
+  const difference = userOffset - hackathonOffset;
+  
+  if (difference > 0) {
+    return `${difference} hours ahead`;
+  } else if (difference < 0) {
+    return `${Math.abs(difference)} hours behind`;
+  } else {
+    return 'the same';
+  }
 };
 
 export default Settings; 

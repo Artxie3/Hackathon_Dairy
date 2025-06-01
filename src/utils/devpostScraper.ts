@@ -1,5 +1,6 @@
 interface DevpostHackathonData {
   title: string;
+  organizer: string;
   description: string;
   startDate: string;
   endDate: string;
@@ -92,10 +93,11 @@ export class DevpostScraper {
   private static extractHackathonData(mainDoc: Document, datesDoc: Document, devpostUrl: string): DevpostHackathonData {
     // Extract title and basic info from main page
     const title = this.extractTitle(mainDoc);
+    const organizer = this.extractOrganizer(mainDoc);
     const description = this.extractDescription(mainDoc);
     const participants = this.extractParticipants(mainDoc);
 
-    // Extract dates from the dates page with proper timezone handling
+    // Extract dates from the dates page
     const dates = this.extractDatesFromSchedule(datesDoc);
     
     // Determine status based on dates
@@ -103,6 +105,7 @@ export class DevpostScraper {
 
     return {
       title,
+      organizer,
       description,
       startDate: dates.startDate,
       endDate: dates.endDate,
@@ -118,12 +121,14 @@ export class DevpostScraper {
       // Look for the schedule table
       const scheduleRows = doc.querySelectorAll('table tr');
       let submissionsRow = null;
+      let judgingRow = null;
 
       for (const row of scheduleRows) {
         const text = row.textContent?.toLowerCase() || '';
         if (text.includes('submission')) {
           submissionsRow = row;
-          break;
+        } else if (text.includes('judging')) {
+          judgingRow = row;
         }
       }
 
@@ -133,7 +138,7 @@ export class DevpostScraper {
           const beginText = cells[0].textContent?.trim() || '';
           const endText = cells[1].textContent?.trim() || '';
 
-          // Parse dates with exact GMT-5 times
+          // Parse dates with GMT-5 timezone
           const startDate = this.parseDevpostDate(beginText);
           const endDate = this.parseDevpostDate(endText);
 
@@ -157,64 +162,45 @@ export class DevpostScraper {
 
   private static parseDevpostDate(dateStr: string): Date | null {
     try {
-      // Clean up the date string
-      const cleanDateStr = dateStr.trim()
-        .replace(/\s+/g, ' ')
-        .replace(/\.$/, '');
-
-      // Handle GMT-5 format: "May 30 at 2:15AM GMT-5"
-      const regex = /([A-Za-z]+)\s+(\d+)\s+at\s+(\d+):(\d+)\s*(AM|PM)\s*GMT-5/i;
-      const match = cleanDateStr.match(regex);
+      // Handle GMT-5 format: "May 30 at 2:15AM GMT-5" or "June 30 at 4:00PM GMT-5"
+      const regex = /([A-Za-z]+)\s+(\d+)\s+at\s+(\d+):(\d+)(AM|PM)\s+GMT-5/i;
+      const match = dateStr.match(regex);
 
       if (match) {
-        const [_, month, day, hourStr, minuteStr, ampm] = match;
+        const [_, month, day, hour, minute, ampm] = match;
         
-        // Parse components
-        const monthIndex = new Date(`${month} 1, 2025`).getMonth();
-        const dayNum = parseInt(day, 10);
-        let hour = parseInt(hourStr, 10);
-        const minute = parseInt(minuteStr, 10);
-
         // Convert to 24-hour format
-        if (ampm.toUpperCase() === 'PM' && hour < 12) {
-          hour += 12;
-        } else if (ampm.toUpperCase() === 'AM' && hour === 12) {
-          hour = 0;
-        }
+        let hours = parseInt(hour);
+        if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
+        if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
 
-        // Create the date directly in UTC
-        // Since GMT-5 is 5 hours behind UTC, we add 5 hours
-        const utcHour = hour + 5;
-        let finalDay = dayNum;
-        let finalMonth = monthIndex;
-        let finalYear = 2025;
+        // Create date for current year (2025)
+        const date = new Date(2025, new Date(`${month} 1, 2025`).getMonth(), parseInt(day));
+        date.setUTCHours(hours + 5, parseInt(minute), 0, 0); // GMT-5 = UTC+5
 
-        // Handle day overflow
-        if (utcHour >= 24) {
-          finalDay += 1;
-          // Check for month overflow
-          const daysInMonth = new Date(finalYear, finalMonth + 1, 0).getDate();
-          if (finalDay > daysInMonth) {
-            finalDay = 1;
-            finalMonth += 1;
-            if (finalMonth > 11) {
-              finalMonth = 0;
-              finalYear += 1;
-            }
-          }
-        }
-
-        const finalUtcHour = utcHour >= 24 ? utcHour - 24 : utcHour;
-        const utcDate = new Date(Date.UTC(finalYear, finalMonth, finalDay, finalUtcHour, minute, 0, 0));
-        
-        return utcDate;
+        return date;
       }
 
-      return null;
+      // Fallback: try to parse other formats
+      const altRegex = /([A-Za-z]+)\s+(\d+)\s+at\s+(\d+):(\d+)(AM|PM)/i;
+      const altMatch = dateStr.match(altRegex);
+      
+      if (altMatch) {
+        const [_, month, day, hour, minute, ampm] = altMatch;
+        
+        let hours = parseInt(hour);
+        if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
+        if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
+
+        const date = new Date(2025, new Date(`${month} 1, 2025`).getMonth(), parseInt(day));
+        date.setUTCHours(hours + 5, parseInt(minute), 0, 0); // Assume GMT-5
+
+        return date;
+      }
     } catch (error) {
       console.error('Error parsing date:', dateStr, error);
-      return null;
     }
+    return null;
   }
 
   private static getDefaultDates(): { startDate: string; endDate: string; submissionDeadline: string } {
@@ -251,6 +237,39 @@ export class DevpostScraper {
     }
 
     return 'Untitled Hackathon';
+  }
+
+  private static extractOrganizer(doc: Document): string {
+    // Try to find organizer information
+    const organizerSelectors = [
+      '[data-testid="organizer"]',
+      '.organizer',
+      '.hackathon-organizer',
+      '.sponsor',
+      '.presented-by'
+    ];
+
+    for (const selector of organizerSelectors) {
+      const element = doc.querySelector(selector);
+      if (element?.textContent?.trim()) {
+        return element.textContent.trim();
+      }
+    }
+
+    // Try to extract from title (e.g., "Hackathon presented by Company")
+    const title = doc.querySelector('h1')?.textContent || '';
+    const presentedByMatch = title.match(/presented by (.+?)$/i);
+    if (presentedByMatch) {
+      return presentedByMatch[1].trim();
+    }
+
+    // Look for sponsor information
+    const sponsorElement = doc.querySelector('[class*="sponsor"], [class*="partner"]');
+    if (sponsorElement?.textContent?.trim()) {
+      return sponsorElement.textContent.trim();
+    }
+
+    return 'Unknown Organizer';
   }
 
   private static extractDescription(doc: Document): string {
@@ -336,11 +355,12 @@ export class DevpostScraper {
     // Set default dates
     const now = new Date();
     const startDate = now.toISOString();
-    const endDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    const submissionDeadline = new Date(now.getTime() + 29 * 24 * 60 * 60 * 1000).toISOString();
+    const endDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days from now
+    const submissionDeadline = new Date(now.getTime() + 29 * 24 * 60 * 60 * 1000).toISOString(); // 29 days from now
 
     return {
       title,
+      organizer: 'Unknown Organizer',
       description: 'Imported from Devpost - Details unavailable. Please update manually.',
       startDate,
       endDate,

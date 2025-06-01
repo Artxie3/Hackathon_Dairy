@@ -3,9 +3,8 @@ import { Plus, Calendar, Clock, Trophy, ExternalLink, Edit, Trash2, Users, Code,
 import { useHackathons, Hackathon } from '../contexts/HackathonContext';
 import { DevpostScraper } from '../utils/devpostScraper';
 import '../styles/Hackathons.css';
-import { format, formatInTimeZone } from 'date-fns-tz';
+import { format } from 'date-fns';
 import { useSettings } from '../contexts/SettingsContext';
-import { addMinutes } from 'date-fns';
 
 const Hackathons: React.FC = () => {
   const { 
@@ -30,6 +29,7 @@ const Hackathons: React.FC = () => {
   const [importError, setImportError] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<Hackathon>>({
     title: '',
+    organizer: '',
     description: '',
     startDate: '',
     endDate: '',
@@ -79,6 +79,7 @@ const Hackathons: React.FC = () => {
   const resetForm = () => {
     setFormData({
       title: '',
+      organizer: '',
       description: '',
       startDate: '',
       endDate: '',
@@ -115,67 +116,49 @@ const Hackathons: React.FC = () => {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    // Since dates are stored in UTC but represent GMT-5 times originally,
-    // we display them in GMT-5 by subtracting 5 hours from UTC
-    const gmt5Date = new Date(date.getTime() - (5 * 60 * 60 * 1000));
-    
-    return gmt5Date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      timeZone: 'UTC' // Force UTC display of our adjusted time
-    }) + ' ' + gmt5Date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'UTC' // Force UTC display of our adjusted time
-    });
+    return format(date, 'MMM d, yyyy h:mma');
   };
 
   const formatDateWithTimezone = (dateString: string) => {
     const date = new Date(dateString);
+    const gmt5Time = format(date, 'MMM d, yyyy h:mma');
     
-    // Display the time as it was originally in GMT-5
-    // Subtract 5 hours from UTC to get back to GMT-5
-    const gmt5Date = new Date(date.getTime() - (5 * 60 * 60 * 1000));
-    
-    const gmt5Time = gmt5Date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      timeZone: 'UTC'
-    }) + ' ' + gmt5Date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'UTC'
-    });
-    
+    // If user's timezone is different from GMT-5, show both times
     if (timezone !== 'GMT-5') {
-      // Calculate user's timezone time by converting from original UTC
-      const userOffsetHours = parseFloat(timezone.replace('GMT', ''));
-      const userDate = new Date(date.getTime() + (userOffsetHours * 60 * 60 * 1000));
+      const userOffset = parseInt(timezone.replace('GMT', '').replace('+', ''));
+      const hackathonOffset = -5;
+      const hoursDifference = userOffset - hackathonOffset;
       
-      const userTime = userDate.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        timeZone: 'UTC'
-      }) + ' ' + userDate.toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-        timeZone: 'UTC'
-      });
+      const userTime = new Date(date.getTime() + (hoursDifference * 60 * 60 * 1000));
+      const userTimeFormatted = format(userTime, 'MMM d, yyyy h:mma');
       
       return (
-        <span>
-          {gmt5Time} GMT-5
-          <span className="timezone-notice">
-            ({userTime} {timezone})
+        <div className="flex flex-col">
+          <span className="font-medium">{gmt5Time} GMT-5</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            ({userTimeFormatted} {timezone})
           </span>
-        </span>
+        </div>
       );
+    }
+    
+    return `${gmt5Time} GMT-5`;
+  };
+
+  // Add function to format regular dates with timezone info
+  const formatRegularDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const gmt5Time = format(date, 'MMM d, yyyy h:mma');
+    
+    if (timezone !== 'GMT-5') {
+      const userOffset = parseInt(timezone.replace('GMT', '').replace('+', ''));
+      const hackathonOffset = -5;
+      const hoursDifference = userOffset - hackathonOffset;
+      
+      const userTime = new Date(date.getTime() + (hoursDifference * 60 * 60 * 1000));
+      const userTimeFormatted = format(userTime, 'h:mma');
+      
+      return `${gmt5Time} GMT-5 (${userTimeFormatted} ${timezone})`;
     }
     
     return `${gmt5Time} GMT-5`;
@@ -219,16 +202,14 @@ const Hackathons: React.FC = () => {
       // Convert dates to the format expected by datetime-local inputs
       const formatDateForInput = (isoString: string) => {
         const date = new Date(isoString);
-        // Convert UTC back to GMT-5 for form input
-        // Since the UTC date represents a GMT-5 time + 5 hours, subtract 5 hours
-        const gmt5Date = new Date(date.getTime() - (5 * 60 * 60 * 1000));
-        return gmt5Date.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+        return date.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
       };
 
       // Update form data with scraped information
       setFormData({
         ...formData,
         title: scrapedData.title,
+        organizer: scrapedData.organizer,
         description: scrapedData.description,
         startDate: formatDateForInput(scrapedData.startDate),
         endDate: formatDateForInput(scrapedData.endDate),
@@ -305,19 +286,15 @@ const Hackathons: React.FC = () => {
         </div>
       )}
 
-      {/* Enhanced timezone warning */}
+      {/* Add timezone warning if different from GMT-5 */}
       {timezone !== 'GMT-5' && (
         <div className="alert alert-warning mb-4">
           <AlertCircle size={20} />
           <div>
-            <h3 className="font-semibold">⚠️ Timezone Notice</h3>
+            <h3 className="font-semibold">Timezone Notice</h3>
             <p className="text-sm">
-              Hackathon deadlines are in <strong>GMT-5 (Eastern Time)</strong>. 
-              Your timezone is set to <strong>{timezone}</strong>.
-              <br />
-              <span className="text-red-600 dark:text-red-400 font-medium">
-                Make sure to check deadline times carefully to avoid missing submissions!
-              </span>
+              Hackathon deadlines are in GMT-5. Your current timezone is set to {timezone}.
+              Please adjust times accordingly to avoid missing deadlines.
             </p>
           </div>
         </div>
@@ -465,14 +442,24 @@ const Hackathons: React.FC = () => {
             )}
 
             <form onSubmit={handleSubmit} className="hackathon-form">
-              <div className="form-group">
-                <label>Title *</label>
-                <input
-                  type="text"
-                  value={formData.title || ''}
-                  onChange={(e) => setFormData({...formData, title: e.target.value})}
-                  required
-                />
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Title *</label>
+                  <input
+                    type="text"
+                    value={formData.title || ''}
+                    onChange={(e) => setFormData({...formData, title: e.target.value})}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Organizer</label>
+                  <input
+                    type="text"
+                    value={formData.organizer || ''}
+                    onChange={(e) => setFormData({...formData, organizer: e.target.value})}
+                  />
+                </div>
               </div>
 
               <div className="form-group">
@@ -482,26 +469,6 @@ const Hackathons: React.FC = () => {
                   onChange={(e) => setFormData({...formData, description: e.target.value})}
                   rows={3}
                 />
-              </div>
-
-              {/* Timezone warning in form */}
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
-                <div className="flex items-start gap-2">
-                  <Clock className="text-blue-600 dark:text-blue-400 mt-0.5" size={16} />
-                  <div className="text-sm">
-                    <p className="font-medium text-blue-800 dark:text-blue-200">
-                      Timezone Information
-                    </p>
-                    <p className="text-blue-700 dark:text-blue-300">
-                      Hackathon times are typically in GMT-5. Your current timezone: <strong>{timezone}</strong>
-                      {timezone !== 'GMT-5' && (
-                        <span className="block mt-1 text-amber-600 dark:text-amber-400">
-                          ⚠️ Times will be converted and displayed in both timezones for clarity.
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                </div>
               </div>
 
               <div className="form-row">
@@ -579,6 +546,7 @@ const Hackathons: React.FC = () => {
             <div className="hackathon-header">
               <div>
                 <h3 className="hackathon-title">{hackathon.title}</h3>
+                <p className="hackathon-organizer">{hackathon.organizer}</p>
               </div>
               <div className="flex gap-2 ml-4">
                 <button
@@ -613,17 +581,24 @@ const Hackathons: React.FC = () => {
             <p className="hackathon-description">{hackathon.description}</p>
 
             <div className="hackathon-dates">
-              <div className="date-info" title="Hackathon Duration">
+              <div className="date-info" title="Start and End Dates">
                 <Calendar size={14} />
                 <span>
-                  {formatDate(hackathon.startDate)} - {formatDate(hackathon.endDate)}
+                  {formatRegularDate(hackathon.startDate)} - {formatRegularDate(hackathon.endDate)}
                 </span>
               </div>
-              <div className="date-info deadline-critical" title="Submission Deadline - Critical!">
+              <div className="date-info" title="Submission Deadline">
                 <Clock size={14} />
-                <span className="font-medium text-red-600 dark:text-red-400">
-                  🚨 Deadline: {formatDateWithTimezone(hackathon.submissionDeadline)}
-                </span>
+                <div className="flex flex-col">
+                  <span className="font-medium text-red-600 dark:text-red-400">
+                    Deadline: {formatDateWithTimezone(hackathon.submissionDeadline)}
+                  </span>
+                  {timezone !== 'GMT-5' && (
+                    <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                      ⚠️ Official time is GMT-5 - verify your local time!
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
