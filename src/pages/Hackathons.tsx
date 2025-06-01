@@ -20,6 +20,7 @@ const Hackathons: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'all' | 'ongoing' | 'upcoming' | 'completed'>('all');
   const [isCreating, setIsCreating] = useState(false);
   const [editingHackathon, setEditingHackathon] = useState<Hackathon | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<Hackathon | null>(null);
   const [importUrl, setImportUrl] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -98,17 +99,16 @@ const Hackathons: React.FC = () => {
     setIsCreating(true);
   };
 
-  const handleDelete = async (hackathon: Hackathon) => {
-    // Create and style a custom confirmation dialog
-    const confirmDelete = () => {
-      const result = window.confirm(
-        `Are you sure you want to delete "${hackathon.title}"?\n\nThis action cannot be undone.`
-      );
-      if (result) {
-        deleteHackathon(hackathon.id);
-      }
-    };
-    confirmDelete();
+  const handleDeleteEntry = (hackathon: Hackathon, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeleteConfirm(hackathon);
+  };
+
+  const confirmDelete = async () => {
+    if (deleteConfirm) {
+      await deleteHackathon(deleteConfirm.id);
+      setDeleteConfirm(null);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -489,22 +489,25 @@ const Hackathons: React.FC = () => {
                 <h3 className="hackathon-title">{hackathon.title}</h3>
                 <p className="hackathon-organizer">{hackathon.organizer}</p>
               </div>
-              <div className="hackathon-actions">
-                <button 
-                  onClick={() => handleEdit(hackathon)} 
-                  className="action-btn edit-btn"
+              
+              {/* Action Buttons */}
+              <div className="flex gap-2 ml-4">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEdit(hackathon);
+                  }}
+                  className="p-2 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors"
                   title="Edit hackathon"
                 >
                   <Edit size={16} />
-                  <span className="action-tooltip">Edit</span>
                 </button>
-                <button 
-                  onClick={() => handleDelete(hackathon)} 
-                  className="action-btn delete-btn"
+                <button
+                  onClick={(e) => handleDeleteEntry(hackathon, e)}
+                  className="p-2 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors"
                   title="Delete hackathon"
                 >
                   <Trash2 size={16} />
-                  <span className="action-tooltip">Delete</span>
                 </button>
               </div>
             </div>
@@ -572,6 +575,34 @@ const Hackathons: React.FC = () => {
               Add Your First Hackathon
             </button>
           )}
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Delete Hackathon
+            </h3>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
+              Are you sure you want to delete "{deleteConfirm.title}"? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+              >
+                Delete Hackathon
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
