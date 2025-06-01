@@ -12,6 +12,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, className = '' })
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
 
@@ -19,29 +20,41 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, className = '' })
     const audio = audioRef.current;
     if (!audio) return;
 
+    console.log('AudioPlayer: Loading audio from:', src);
+    setHasError(false);
+    setIsLoading(true);
+    setDuration(0);
+    setCurrentTime(0);
+    setIsPlaying(false);
+
     const handleLoadedMetadata = () => {
-      if (audio.duration && isFinite(audio.duration)) {
+      console.log('AudioPlayer: Metadata loaded');
+      console.log('Duration:', audio.duration);
+      console.log('ReadyState:', audio.readyState);
+      
+      if (audio.duration && isFinite(audio.duration) && audio.duration > 0) {
         setDuration(audio.duration);
         setIsLoading(false);
+        console.log('AudioPlayer: Duration set to:', audio.duration);
       }
     };
 
-    const handleLoadedData = () => {
-      if (audio.duration && isFinite(audio.duration)) {
+    const handleCanPlay = () => {
+      console.log('AudioPlayer: Can play - duration:', audio.duration);
+      if (audio.duration && isFinite(audio.duration) && audio.duration > 0) {
         setDuration(audio.duration);
-        setIsLoading(false);
       }
-    };
-
-    const handleDurationChange = () => {
-      if (audio.duration && isFinite(audio.duration)) {
-        setDuration(audio.duration);
-        setIsLoading(false);
-      }
+      setIsLoading(false);
     };
 
     const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime);
+      
+      // Fallback: try to get duration during playback
+      if (duration === 0 && audio.duration && isFinite(audio.duration) && audio.duration > 0) {
+        console.log('AudioPlayer: Got duration during playback:', audio.duration);
+        setDuration(audio.duration);
+      }
     };
 
     const handleEnded = () => {
@@ -49,49 +62,37 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, className = '' })
       setCurrentTime(0);
     };
 
-    const handleCanPlay = () => {
-      if (audio.duration && isFinite(audio.duration)) {
-        setDuration(audio.duration);
+    const handleError = (e: Event) => {
+      console.error('AudioPlayer: Error loading audio:', e);
+      console.error('Audio error details:', audio.error);
+      setIsLoading(false);
+      setHasError(true);
+    };
+
+    const handleProgress = () => {
+      if (audio.buffered.length > 0) {
+        console.log('AudioPlayer: Buffered:', audio.buffered.end(0));
       }
-      setIsLoading(false);
     };
-
-    const handleError = () => {
-      setIsLoading(false);
-      console.error('Error loading audio file');
-    };
-
-    // Reset states when src changes
-    setIsLoading(true);
-    setDuration(0);
-    setCurrentTime(0);
-    setIsPlaying(false);
 
     // Add event listeners
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audio.addEventListener('loadeddata', handleLoadedData);
-    audio.addEventListener('durationchange', handleDurationChange);
+    audio.addEventListener('canplay', handleCanPlay);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
-    audio.addEventListener('canplay', handleCanPlay);
     audio.addEventListener('error', handleError);
+    audio.addEventListener('progress', handleProgress);
 
-    // Force load metadata if not already loaded
-    if (audio.readyState >= 1 && audio.duration && isFinite(audio.duration)) {
-      setDuration(audio.duration);
-      setIsLoading(false);
-    } else {
-      audio.load();
-    }
+    // Force load
+    audio.load();
 
     return () => {
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      audio.removeEventListener('loadeddata', handleLoadedData);
-      audio.removeEventListener('durationchange', handleDurationChange);
+      audio.removeEventListener('canplay', handleCanPlay);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
-      audio.removeEventListener('canplay', handleCanPlay);
       audio.removeEventListener('error', handleError);
+      audio.removeEventListener('progress', handleProgress);
     };
   }, [src]);
 
@@ -105,6 +106,15 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, className = '' })
       } else {
         await audioRef.current.play();
         setIsPlaying(true);
+        
+        // Try to get duration after starting playback
+        setTimeout(() => {
+          const audio = audioRef.current;
+          if (audio && duration === 0 && audio.duration && isFinite(audio.duration)) {
+            console.log('AudioPlayer: Got duration after play start:', audio.duration);
+            setDuration(audio.duration);
+          }
+        }, 100);
       }
     } catch (error) {
       console.error('Error playing audio:', error);
@@ -144,18 +154,31 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, className = '' })
 
   const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+  if (hasError) {
+    return (
+      <div className={`flex items-center gap-3 w-full min-w-0 ${className}`}>
+        <div className="text-sm text-red-500 dark:text-red-400">
+          Audio failed to load
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`flex items-center gap-3 w-full min-w-0 ${className}`}>
-      <audio ref={audioRef} src={src} preload="metadata" />
+      <audio 
+        ref={audioRef} 
+        src={src} 
+        preload="metadata"
+      />
       
       {/* Play/Pause Button */}
       <button
         onClick={togglePlay}
-        disabled={isLoading}
         className="flex-shrink-0 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
         title={isPlaying ? 'Pause' : 'Play'}
       >
-        {isLoading ? (
+        {isLoading && duration === 0 ? (
           <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-gray-600"></div>
         ) : isPlaying ? (
           <Pause size={18} />
