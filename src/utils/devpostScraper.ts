@@ -7,6 +7,7 @@ interface DevpostHackathonData {
   devpostUrl: string;
   participants?: number;
   status: 'upcoming' | 'ongoing' | 'completed';
+  detectedTimezone: string; // Add timezone info
 }
 
 export class DevpostScraper {
@@ -95,125 +96,107 @@ export class DevpostScraper {
     const description = this.extractDescription(mainDoc);
     const participants = this.extractParticipants(mainDoc);
 
-    // Extract dates from the dates page
-    const dates = this.extractDatesFromSchedule(datesDoc);
+    // Extract dates from the dates page and detect timezone
+    const dateResult = this.extractDatesFromSchedule(datesDoc);
     
     // Determine status based on dates
-    const status = this.determineStatus(dates.submissionDeadline);
+    const status = this.determineStatus(dateResult.submissionDeadline);
 
     return {
       title,
       description,
-      startDate: dates.startDate,
-      endDate: dates.endDate,
-      submissionDeadline: dates.submissionDeadline,
+      startDate: dateResult.startDate,
+      endDate: dateResult.endDate,
+      submissionDeadline: dateResult.submissionDeadline,
       devpostUrl,
       participants,
-      status
+      status,
+      detectedTimezone: dateResult.detectedTimezone
     };
   }
 
-  private static extractDatesFromSchedule(doc: Document): { startDate: string; endDate: string; submissionDeadline: string } {
+  private static extractDatesFromSchedule(doc: Document): { 
+    startDate: string; 
+    endDate: string; 
+    submissionDeadline: string; 
+    detectedTimezone: string;
+  } {
     try {
+      // Look for timezone indicator first
+      const timezoneElement = doc.querySelector('[class*="timezone"]') || 
+                             doc.querySelector('body');
+      let detectedTimezone = 'GMT-5'; // Default
+
+      // Look for timezone in the page text
+      const pageText = doc.body?.textContent || '';
+      const timezoneMatch = pageText.match(/(GMT[+-]\d+)/gi);
+      if (timezoneMatch && timezoneMatch[0]) {
+        detectedTimezone = timezoneMatch[0].toUpperCase();
+      }
+
       // Look for the schedule table
       const scheduleRows = doc.querySelectorAll('table tr');
       let submissionsRow = null;
 
       for (const row of scheduleRows) {
-        const cells = row.querySelectorAll('td');
-        if (cells.length >= 2) {
-          const periodText = cells[0]?.textContent?.toLowerCase() || '';
-          if (periodText.includes('submission')) {
-            submissionsRow = row;
-            break;
-          }
+        const text = row.textContent?.toLowerCase() || '';
+        if (text.includes('submission')) {
+          submissionsRow = row;
+          break;
         }
       }
 
       if (submissionsRow) {
         const cells = submissionsRow.querySelectorAll('td');
-        if (cells.length >= 3) {
-          // Get the text content from BEGINS and ENDS columns
-          const beginText = cells[1]?.textContent?.trim() || '';
-          const endText = cells[2]?.textContent?.trim() || '';
+        if (cells.length >= 2) {
+          const beginText = cells[0].textContent?.trim() || '';
+          const endText = cells[1].textContent?.trim() || '';
 
-          console.log('Parsing dates from schedule:', { beginText, endText });
+          console.log('Parsing dates:', { beginText, endText, detectedTimezone });
 
-          // Parse dates with proper GMT-5 handling
-          const startDate = this.parseDevpostDate(beginText);
-          const endDate = this.parseDevpostDate(endText);
+          // Parse dates and keep them in the detected timezone
+          const startDate = this.parseDevpostDateKeepTimezone(beginText, detectedTimezone);
+          const endDate = this.parseDevpostDateKeepTimezone(endText, detectedTimezone);
 
           if (startDate && endDate) {
-            console.log('Parsed dates successfully:', { 
-              startDate: startDate.toISOString(), 
-              endDate: endDate.toISOString() 
-            });
-            
             return {
               startDate: startDate.toISOString(),
               endDate: endDate.toISOString(),
-              submissionDeadline: endDate.toISOString()
+              submissionDeadline: endDate.toISOString(),
+              detectedTimezone
             };
           }
         }
       }
 
       // Fallback to default date handling
-      console.log('Using fallback dates');
-      return this.getDefaultDates();
+      return this.getDefaultDates(detectedTimezone);
     } catch (error) {
       console.error('Error parsing schedule:', error);
-      return this.getDefaultDates();
+      return this.getDefaultDates('GMT-5');
     }
   }
 
-  private static parseDevpostDate(dateStr: string): Date | null {
+  private static parseDevpostDateKeepTimezone(dateStr: string, timezone: string): Date | null {
     try {
-      console.log('Parsing date string:', dateStr);
-      
-      // Handle GMT-5 format: "May 30 at 2:15AM GMT-5" or "June 30 at 4:00PM GMT-5"
-      const regex = /([A-Za-z]+)\s+(\d+)\s+at\s+(\d+):(\d+)(AM|PM)\s+GMT-5/i;
+      // Handle various formats: "May 30 at 2:15AM GMT-5" or "June 30 at 4:00PM GMT-5"
+      const regex = /([A-Za-z]+)\s+(\d+)\s+at\s+(\d+):(\d+)(AM|PM)/i;
       const match = dateStr.match(regex);
 
       if (match) {
         const [_, month, day, hour, minute, ampm] = match;
-        
-        console.log('Date components:', { month, day, hour, minute, ampm });
         
         // Convert to 24-hour format
         let hours = parseInt(hour);
         if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
         if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
 
-        // Create date for 2025 in UTC, accounting for GMT-5
-        const date = new Date();
-        date.setUTCFullYear(2025);
-        date.setUTCMonth(new Date(`${month} 1, 2025`).getMonth());
-        date.setUTCDate(parseInt(day));
+        // Create date for 2025 and set UTC time based on timezone offset
+        const timezoneOffset = this.getTimezoneOffset(timezone);
+        const date = new Date(2025, new Date(`${month} 1, 2025`).getMonth(), parseInt(day));
         
-        // GMT-5 means we need to add 5 hours to get UTC
-        date.setUTCHours(hours + 5, parseInt(minute), 0, 0);
-
-        console.log('Created date:', date.toISOString());
-        return date;
-      }
-
-      // Fallback: try to parse simpler formats
-      const altRegex = /([A-Za-z]+)\s+(\d+)\s+at\s+(\d+):(\d+)(AM|PM)/i;
-      const altMatch = dateStr.match(altRegex);
-      
-      if (altMatch) {
-        const [_, month, day, hour, minute, ampm] = altMatch;
-        
-        let hours = parseInt(hour);
-        if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
-        if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
-
-        const date = new Date();
-        date.setUTCFullYear(2025);
-        date.setUTCMonth(new Date(`${month} 1, 2025`).getMonth());
-        date.setUTCDate(parseInt(day));
-        date.setUTCHours(hours + 5, parseInt(minute), 0, 0); // Assume GMT-5
+        // Set UTC time by adding the timezone offset
+        date.setUTCHours(hours + timezoneOffset, parseInt(minute), 0, 0);
 
         return date;
       }
@@ -223,7 +206,23 @@ export class DevpostScraper {
     return null;
   }
 
-  private static getDefaultDates(): { startDate: string; endDate: string; submissionDeadline: string } {
+  private static getTimezoneOffset(timezone: string): number {
+    // Convert timezone string to offset hours
+    const match = timezone.match(/GMT([+-])(\d+)/);
+    if (match) {
+      const sign = match[1] === '+' ? -1 : 1; // Reverse for UTC offset
+      const hours = parseInt(match[2]);
+      return sign * hours;
+    }
+    return 5; // Default to GMT-5 offset
+  }
+
+  private static getDefaultDates(timezone: string): { 
+    startDate: string; 
+    endDate: string; 
+    submissionDeadline: string; 
+    detectedTimezone: string;
+  } {
     const now = new Date();
     const end = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
     const deadline = new Date(end.getTime() - 24 * 60 * 60 * 1000);
@@ -231,7 +230,8 @@ export class DevpostScraper {
     return {
       startDate: now.toISOString(),
       endDate: end.toISOString(),
-      submissionDeadline: deadline.toISOString()
+      submissionDeadline: deadline.toISOString(),
+      detectedTimezone: timezone
     };
   }
 
@@ -342,8 +342,8 @@ export class DevpostScraper {
     // Set default dates
     const now = new Date();
     const startDate = now.toISOString();
-    const endDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days from now
-    const submissionDeadline = new Date(now.getTime() + 29 * 24 * 60 * 60 * 1000).toISOString(); // 29 days from now
+    const endDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const submissionDeadline = new Date(now.getTime() + 29 * 24 * 60 * 60 * 1000).toISOString();
 
     return {
       title,
@@ -352,7 +352,8 @@ export class DevpostScraper {
       endDate,
       submissionDeadline,
       devpostUrl,
-      status: 'upcoming'
+      status: 'upcoming',
+      detectedTimezone: 'Unknown'
     };
   }
 } 

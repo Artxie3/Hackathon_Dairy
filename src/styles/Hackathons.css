@@ -663,7 +663,7 @@
   }
 }
 
-/* Import Success State */
+/* Success State */
 .import-success {
   display: flex;
   align-items: center;
@@ -674,51 +674,12 @@
   border-radius: 0.5rem;
   font-size: 0.875rem;
   border: 1px solid #a7f3d0;
-  margin-top: 0.5rem;
 }
 
 .dark-theme .import-success {
   background: #064e3b;
   color: #34d399;
   border-color: #047857;
-}
-
-/* Timezone Warning */
-.timezone-warning {
-  margin-top: 0.5rem;
-}
-
-.timezone-warning .warning-content {
-  padding: 0.75rem;
-  background: #fef3c7;
-  color: #92400e;
-  border: 1px solid #fcd34d;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-}
-
-.dark-theme .timezone-warning .warning-content {
-  background: #451a03;
-  color: #fbbf24;
-  border-color: #92400e;
-}
-
-/* Form field labels with timezone info */
-.form-label-with-timezone {
-  display: flex;
-  align-items: center;
-  justify-content: between;
-  gap: 0.5rem;
-}
-
-.timezone-indicator {
-  font-size: 0.75rem;
-  color: var(--color-gray-500);
-  font-weight: normal;
-}
-
-.dark-theme .timezone-indicator {
-  color: var(--color-gray-400);
 }
 
 /* Responsive Design for Import Section */
@@ -792,6 +753,36 @@
   .hackathon-actions {
     align-self: flex-end;
   }
+}
+
+/* Timezone Warning */
+.timezone-warning {
+  margin: 1.5rem 0;
+}
+
+.timezone-warning .text-xs {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.timezone-warning .font-medium {
+  font-weight: 500;
+}
+
+.timezone-warning .mt-1 {
+  margin-top: 0.25rem;
+}
+
+.timezone-warning .mt-2 {
+  margin-top: 0.5rem;
+}
+
+.timezone-warning .mb-1 {
+  margin-bottom: 0.25rem;
+}
+
+.timezone-warning .mb-2 {
+  margin-bottom: 0.5rem;
 }
 
 /* Remove prizes-related styles */

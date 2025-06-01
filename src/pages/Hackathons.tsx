@@ -42,6 +42,7 @@ const Hackathons: React.FC = () => {
     technologies: [],
     notes: '',
   });
+  const [importedTimezone, setImportedTimezone] = useState<string | null>(null);
   const [hackathonToDelete, setHackathonToDelete] = useState<Hackathon | null>(null);
 
   const upcomingDeadlines = getUpcomingDeadlines();
@@ -203,6 +204,9 @@ const Hackathons: React.FC = () => {
         return date.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
       };
 
+      // Store the detected timezone
+      setImportedTimezone(scrapedData.detectedTimezone);
+
       // Update form data with scraped information
       setFormData({
         ...formData,
@@ -217,17 +221,9 @@ const Hackathons: React.FC = () => {
 
       setImportUrl(''); // Clear the import URL field
       
-      // Show success message with timezone info
+      // Show success message
       console.log('Successfully imported hackathon data:', scrapedData);
-      console.log('All times imported in GMT-5 timezone');
-
-      // Clear any previous errors and show success
-      setImportError(null);
       
-      // Temporarily show a success message
-      const successMessage = 'Successfully imported! All times are in GMT-5 timezone.';
-      console.log(successMessage);
-
     } catch (error) {
       console.error('Import failed:', error);
       
@@ -238,6 +234,7 @@ const Hackathons: React.FC = () => {
           ...formData,
           ...basicData,
         });
+        setImportedTimezone('Unknown');
         setImportError('Partial import successful - please verify and complete the details');
       } catch (fallbackError) {
         setImportError(error instanceof Error ? error.message : 'Failed to import hackathon data');
@@ -468,51 +465,75 @@ const Hackathons: React.FC = () => {
                 />
               </div>
 
+              {/* Show timezone warning if dates were imported */}
+              {importedTimezone && (
+                <div className="timezone-warning">
+                  <div className="flex items-start gap-3 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                    <AlertCircle className="text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" size={20} />
+                    <div>
+                      <h3 className="font-medium text-yellow-800 dark:text-yellow-300 mb-1">
+                        Timezone Information
+                      </h3>
+                      <p className="text-sm text-yellow-700 dark:text-yellow-400 mb-2">
+                        <strong>Imported dates are in {importedTimezone} timezone.</strong>
+                      </p>
+                      <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                        Please verify these times are correct for your location. The form shows times as they appear in your browser's local timezone.
+                      </p>
+                      {timezone !== importedTimezone && (
+                        <p className="text-sm text-red-600 dark:text-red-400 mt-2 font-medium">
+                          ⚠️ Your account timezone ({timezone}) differs from imported timezone ({importedTimezone})
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="form-row">
                 <div className="form-group">
-                  <div className="form-label-with-timezone">
-                    <label>Start Date *</label>
-                    <span className="timezone-indicator">(GMT-5)</span>
-                  </div>
+                  <label>Start Date *</label>
                   <input
                     type="datetime-local"
                     value={formData.startDate || ''}
                     onChange={(e) => setFormData({...formData, startDate: e.target.value})}
                     required
                   />
+                  {importedTimezone && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Imported from {importedTimezone} timezone
+                    </p>
+                  )}
                 </div>
                 <div className="form-group">
-                  <div className="form-label-with-timezone">
-                    <label>End Date *</label>
-                    <span className="timezone-indicator">(GMT-5)</span>
-                  </div>
+                  <label>End Date *</label>
                   <input
                     type="datetime-local"
                     value={formData.endDate || ''}
                     onChange={(e) => setFormData({...formData, endDate: e.target.value})}
                     required
                   />
+                  {importedTimezone && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Imported from {importedTimezone} timezone
+                    </p>
+                  )}
                 </div>
               </div>
 
               <div className="form-row">
                 <div className="form-group">
-                  <div className="form-label-with-timezone">
-                    <label>Submission Deadline *</label>
-                    <span className="timezone-indicator">(GMT-5)</span>
-                  </div>
+                  <label>Submission Deadline *</label>
                   <input
                     type="datetime-local"
                     value={formData.submissionDeadline || ''}
                     onChange={(e) => setFormData({...formData, submissionDeadline: e.target.value})}
                     required
                   />
-                  {timezone !== 'GMT-5' && (
-                    <div className="timezone-warning">
-                      <div className="warning-content">
-                        ⚠️ Deadline time is in GMT-5. Your timezone is {timezone}. Double-check the time conversion!
-                      </div>
-                    </div>
+                  {importedTimezone && (
+                    <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-medium">
+                      ⚠️ Critical: Imported from {importedTimezone} timezone - verify this is correct!
+                    </p>
                   )}
                 </div>
                 <div className="form-group">

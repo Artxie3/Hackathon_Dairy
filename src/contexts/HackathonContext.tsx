@@ -4,7 +4,6 @@ import { useAuth } from './AuthContext';
 export interface Hackathon {
   id: string;
   title: string;
-  organizer: string;
   description: string;
   startDate: string;
   endDate: string;
@@ -16,7 +15,6 @@ export interface Hackathon {
   projectUrl?: string;
   teamMembers: string[];
   technologies: string[];
-  prizes: string[];
   notes: string;
   created_at: string;
   updated_at: string;
