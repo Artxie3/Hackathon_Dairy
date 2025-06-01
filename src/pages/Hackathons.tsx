@@ -115,15 +115,29 @@ const Hackathons: React.FC = () => {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return format(date, 'MMM d, yyyy h:mm a');
+    // Since dates are stored in UTC and represent GMT-5 times,
+    // we need to display them as GMT-5 times
+    const gmt5Offset = -5 * 60; // GMT-5 in minutes
+    const gmt5Date = new Date(date.getTime() + (gmt5Offset * 60 * 1000));
+    
+    return gmt5Date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    }) + ' ' + gmt5Date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
   };
 
-  const formatDateWithTimezone = (dateString: string, targetTimezone: string = 'GMT-5') => {
+  const formatDateWithTimezone = (dateString: string) => {
     const date = new Date(dateString);
     
-    // Convert UTC date to GMT-5 for display
-    const gmt5Offset = -5; // GMT-5 is 5 hours behind UTC
-    const gmt5Date = new Date(date.getTime() + (gmt5Offset * 60 * 60 * 1000));
+    // Display the time as it was originally in GMT-5
+    // Since we stored it correctly in UTC, we convert back to GMT-5 for display
+    const gmt5Offset = -5 * 60; // GMT-5 in minutes  
+    const gmt5Date = new Date(date.getTime() + (gmt5Offset * 60 * 1000));
     
     const gmt5Time = gmt5Date.toLocaleDateString('en-US', {
       month: 'short',
@@ -136,9 +150,10 @@ const Hackathons: React.FC = () => {
     });
     
     if (timezone !== 'GMT-5') {
-      // Also show user's local time
-      const userOffset = parseFloat(timezone.replace('GMT', ''));
-      const userDate = new Date(date.getTime() + (userOffset * 60 * 60 * 1000));
+      // Calculate user's timezone time
+      const userOffset = parseFloat(timezone.replace('GMT', '')) * 60; // Convert to minutes
+      const userDate = new Date(date.getTime() + (userOffset * 60 * 1000));
+      
       const userTime = userDate.toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
