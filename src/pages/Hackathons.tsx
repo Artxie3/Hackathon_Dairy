@@ -37,7 +37,6 @@ const Hackathons: React.FC = () => {
     projectUrl: '',
     teamMembers: [],
     technologies: [],
-    prizes: [],
     notes: '',
   });
 
@@ -87,7 +86,6 @@ const Hackathons: React.FC = () => {
       projectUrl: '',
       teamMembers: [],
       technologies: [],
-      prizes: [],
       notes: '',
     });
     setIsCreating(false);
@@ -100,10 +98,17 @@ const Hackathons: React.FC = () => {
     setIsCreating(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this hackathon?')) {
-      await deleteHackathon(id);
-    }
+  const handleDelete = async (hackathon: Hackathon) => {
+    // Create and style a custom confirmation dialog
+    const confirmDelete = () => {
+      const result = window.confirm(
+        `Are you sure you want to delete "${hackathon.title}"?\n\nThis action cannot be undone.`
+      );
+      if (result) {
+        deleteHackathon(hackathon.id);
+      }
+    };
+    confirmDelete();
   };
 
   const formatDate = (dateString: string) => {
@@ -166,7 +171,6 @@ const Hackathons: React.FC = () => {
         submissionDeadline: formatDateForInput(scrapedData.submissionDeadline),
         status: scrapedData.status,
         devpostUrl: scrapedData.devpostUrl,
-        prizes: scrapedData.prizes,
       });
 
       setImportUrl(''); // Clear the import URL field
@@ -463,20 +467,6 @@ const Hackathons: React.FC = () => {
                 />
               </div>
 
-              {/* Show imported prizes if any */}
-              {formData.prizes && formData.prizes.length > 0 && (
-                <div className="form-group">
-                  <label>Imported Prizes</label>
-                  <div className="prizes-display">
-                    {formData.prizes.map((prize, index) => (
-                      <span key={index} className="prize-tag">
-                        {prize}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               <div className="form-actions">
                 <button type="button" onClick={resetForm} className="btn btn-secondary">
                   Cancel
@@ -500,11 +490,21 @@ const Hackathons: React.FC = () => {
                 <p className="hackathon-organizer">{hackathon.organizer}</p>
               </div>
               <div className="hackathon-actions">
-                <button onClick={() => handleEdit(hackathon)} className="action-btn">
+                <button 
+                  onClick={() => handleEdit(hackathon)} 
+                  className="action-btn edit-btn"
+                  title="Edit hackathon"
+                >
                   <Edit size={16} />
+                  <span className="action-tooltip">Edit</span>
                 </button>
-                <button onClick={() => handleDelete(hackathon.id)} className="action-btn">
+                <button 
+                  onClick={() => handleDelete(hackathon)} 
+                  className="action-btn delete-btn"
+                  title="Delete hackathon"
+                >
                   <Trash2 size={16} />
+                  <span className="action-tooltip">Delete</span>
                 </button>
               </div>
             </div>

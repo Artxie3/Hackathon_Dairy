@@ -6,7 +6,6 @@ interface DevpostHackathonData {
   endDate: string;
   submissionDeadline: string;
   devpostUrl: string;
-  prizes: string[];
   participants?: number;
   status: 'upcoming' | 'ongoing' | 'completed';
 }
@@ -91,9 +90,6 @@ export class DevpostScraper {
     // Extract dates (start/end)
     const dates = this.extractDates(doc, deadline);
     
-    // Extract prizes
-    const prizes = this.extractPrizes(doc);
-    
     // Extract participants count
     const participants = this.extractParticipants(doc);
     
@@ -108,7 +104,6 @@ export class DevpostScraper {
       endDate: dates.endDate,
       submissionDeadline: deadline,
       devpostUrl,
-      prizes,
       participants,
       status
     };
@@ -288,38 +283,6 @@ export class DevpostScraper {
     };
   }
 
-  private static extractPrizes(doc: Document): string[] {
-    const prizes: string[] = [];
-    
-    // Look for prize information
-    const prizeSelectors = [
-      '[class*="prize"]',
-      '[data-testid*="prize"]',
-      '.award',
-      '.reward'
-    ];
-
-    for (const selector of prizeSelectors) {
-      const elements = doc.querySelectorAll(selector);
-      elements.forEach(element => {
-        const text = element.textContent?.trim();
-        if (text && text.match(/\$[\d,]+/)) {
-          prizes.push(text);
-        }
-      });
-    }
-
-    // Look for money patterns in text
-    const bodyText = doc.body?.textContent || '';
-    const moneyMatches = bodyText.match(/\$[\d,]+(?:\.\d{2})?(?:\s*(?:in|of)\s*(?:prizes?|cash|awards?))?/gi);
-    
-    if (moneyMatches) {
-      prizes.push(...moneyMatches.slice(0, 5)); // Limit to 5 prizes
-    }
-
-    return [...new Set(prizes)]; // Remove duplicates
-  }
-
   private static extractParticipants(doc: Document): number | undefined {
     const bodyText = doc.body?.textContent || '';
     const participantMatch = bodyText.match(/(\d+)\s*participants?/i);
@@ -408,7 +371,6 @@ export class DevpostScraper {
       endDate,
       submissionDeadline,
       devpostUrl,
-      prizes: [],
       status: 'upcoming'
     };
   }
