@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Calendar, Clock, Trophy, ExternalLink, Edit, Trash2, Users, Code, AlertCircle, Download, Loader } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Calendar, Clock, Trophy, ExternalLink, Edit, Trash2, Users, Code, AlertCircle, Download, Loader, Globe } from 'lucide-react';
 import { useHackathons, Hackathon } from '../contexts/HackathonContext';
 import { DevpostScraper } from '../utils/devpostScraper';
 import '../styles/Hackathons.css';
@@ -24,6 +24,7 @@ const Hackathons: React.FC = () => {
   const [importUrl, setImportUrl] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [userTimezone, setUserTimezone] = useState<string>('');
   const [formData, setFormData] = useState<Partial<Hackathon>>({
     title: '',
     organizer: '',
@@ -44,6 +45,11 @@ const Hackathons: React.FC = () => {
   const upcomingDeadlines = getUpcomingDeadlines();
   const ongoingHackathons = getOngoingHackathons();
   const completedHackathons = getCompletedHackathons();
+
+  useEffect(() => {
+    // Get user's timezone
+    setUserTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  }, []);
 
   const getFilteredHackathons = () => {
     switch (activeTab) {
@@ -137,6 +143,63 @@ const Hackathons: React.FC = () => {
     return diffDays;
   };
 
+  const formatDateWithTimezone = (dateString: string, timezone?: string, originalText?: string) => {
+    const date = new Date(dateString);
+    const userTz = userTimezone || 'UTC';
+    
+    // Format in user's timezone
+    const userTime = new Intl.DateTimeFormat('en-US', {
+      timeZone: userTz,
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZoneName: 'short'
+    }).format(date);
+
+    // If we have original timezone info, also show that
+    let originalTime = '';
+    if (timezone) {
+      try {
+        // Try to parse the timezone and convert
+        let tzOffset = '';
+        if (timezone.includes('GMT')) {
+          tzOffset = timezone.replace('GMT', 'UTC');
+        } else {
+          tzOffset = timezone;
+        }
+        
+        originalTime = new Intl.DateTimeFormat('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }).format(date) + ` (${timezone})`;
+      } catch (error) {
+        originalTime = originalText || '';
+      }
+    }
+
+    return { userTime, originalTime, isEstimated: originalText?.includes('Estimated') };
+  };
+
+  const getTimezoneWarning = (dateString: string, timezone?: string) => {
+    if (!timezone) return null;
+    
+    const deadline = new Date(dateString);
+    const now = new Date();
+    const diffHours = (deadline.getTime() - now.getTime()) / (1000 * 60 * 60);
+    
+    if (diffHours < 24) {
+      return 'urgent';
+    } else if (diffHours < 72) {
+      return 'warning';
+    }
+    return null;
+  };
+
   const handleImportFromDevpost = async () => {
     if (!importUrl.trim()) {
       setImportError('Please enter a Devpost URL');
@@ -171,12 +234,18 @@ const Hackathons: React.FC = () => {
         submissionDeadline: formatDateForInput(scrapedData.submissionDeadline),
         status: scrapedData.status,
         devpostUrl: scrapedData.devpostUrl,
+        // Store timezone info in notes for now
+        notes: scrapedData.timezone 
+          ? `Imported deadline: ${scrapedData.deadlineText}\nTimezone: ${scrapedData.timezone}`
+          : scrapedData.deadlineText || ''
       });
 
       setImportUrl(''); // Clear the import URL field
       
-      // Show success message
-      console.log('Successfully imported hackathon data:', scrapedData);
+      // Show success message with timezone info
+      if (scrapedData.timezone) {
+        console.log(`Successfully imported hackathon with timezone: ${scrapedData.timezone}`);
+      }
       
     } catch (error) {
       console.error('Import failed:', error);
@@ -531,9 +600,59 @@ const Hackathons: React.FC = () => {
                 <Calendar size={14} />
                 <span>{formatDate(hackathon.startDate)} - {formatDate(hackathon.endDate)}</span>
               </div>
-              <div className="date-info">
-                <Clock size={14} />
-                <span>Deadline: {formatDate(hackathon.submissionDeadline)}</span>
+              
+              <div className="deadline-section">
+                <div className="date-info">
+                  <Clock size={14} />
+                  <div className="deadline-info-container">
+                    {(() => {
+                      // Try to extract timezone from notes if stored there
+                      const timezoneLine = hackathon.notes?.split('\n').find(line => line.includes('Timezone:'));
+                      const originalTimezone = timezoneLine?.replace('Timezone:', '').trim();
+                      const deadlineTextLine = hackathon.notes?.split('\n').find(line => line.includes('Imported deadline:'));
+                      const originalText = deadlineTextLine?.replace('Imported deadline:', '').trim();
+                      
+                      const { userTime, originalTime, isEstimated } = formatDateWithTimezone(
+                        hackathon.submissionDeadline, 
+                        originalTimezone,
+                        originalText
+                      );
+                      const warning = getTimezoneWarning(hackathon.submissionDeadline, originalTimezone);
+                      
+                      return (
+                        <>
+                          <div className="deadline-main">
+                            <span>Deadline: {userTime}</span>
+                            {isEstimated && (
+                              <span className="estimated-badge">
+                                <AlertCircle size={12} />
+                                Estimated
+                              </span>
+                            )}
+                          </div>
+                          
+                          {originalTime && originalTime !== userTime && (
+                            <div className="deadline-original">
+                              <Globe size={12} />
+                              <span>Original: {originalTime}</span>
+                            </div>
+                          )}
+                          
+                          {warning && (
+                            <div className={`timezone-warning ${warning}`}>
+                              <AlertCircle size={12} />
+                              <span>
+                                {warning === 'urgent' 
+                                  ? 'Deadline in less than 24 hours!' 
+                                  : 'Deadline approaching soon!'}
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
               </div>
             </div>
 

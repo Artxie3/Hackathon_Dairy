@@ -8,6 +8,8 @@ interface DevpostHackathonData {
   devpostUrl: string;
   participants?: number;
   status: 'upcoming' | 'ongoing' | 'completed';
+  timezone?: string;
+  deadlineText?: string; // Original deadline text for reference
 }
 
 export class DevpostScraper {
@@ -84,17 +86,17 @@ export class DevpostScraper {
     // Extract description
     const description = this.extractDescription(doc);
     
-    // Extract deadline
-    const deadline = this.extractDeadline(doc);
+    // Extract deadline with timezone info
+    const deadlineInfo = this.extractDeadline(doc);
     
     // Extract dates (start/end)
-    const dates = this.extractDates(doc, deadline);
+    const dates = this.extractDates(doc, deadlineInfo.deadline);
     
     // Extract participants count
     const participants = this.extractParticipants(doc);
     
     // Determine status based on deadline
-    const status = this.determineStatus(deadline);
+    const status = this.determineStatus(deadlineInfo.deadline);
 
     return {
       title,
@@ -102,10 +104,12 @@ export class DevpostScraper {
       description,
       startDate: dates.startDate,
       endDate: dates.endDate,
-      submissionDeadline: deadline,
+      submissionDeadline: deadlineInfo.deadline,
       devpostUrl,
       participants,
-      status
+      status,
+      timezone: deadlineInfo.timezone,
+      deadlineText: deadlineInfo.originalText
     };
   }
 
@@ -202,43 +206,220 @@ export class DevpostScraper {
     return 'No description available';
   }
 
-  private static extractDeadline(doc: Document): string {
-    // Look for deadline information
+  private static extractDeadline(doc: Document): { deadline: string; timezone?: string; originalText?: string } {
+    // Look for deadline information with various selectors
     const deadlineSelectors = [
-      '[data-testid="deadline"]',
-      '.deadline',
-      '.submission-deadline',
+      // Specific deadline containers
       '[class*="deadline"]',
-      '[class*="due"]'
+      '[data-testid*="deadline"]',
+      '.submission-deadline',
+      '[class*="due"]',
+      '.due-date',
+      
+      // General date containers that might contain deadline
+      '.date-info',
+      '.event-date',
+      '.hackathon-date',
+      '[class*="date"]',
+      
+      // Sidebar information
+      '.sidebar [class*="date"]',
+      '.event-details [class*="date"]',
+      '.hackathon-info [class*="date"]'
     ];
 
+    let bestMatch = null;
+    let bestScore = 0;
+
+    // Try each selector and score the results
     for (const selector of deadlineSelectors) {
-      const element = doc.querySelector(selector);
-      if (element?.textContent?.trim()) {
-        const dateStr = element.textContent.trim();
-        const parsedDate = this.parseDate(dateStr);
-        if (parsedDate) {
-          return parsedDate;
+      const elements = doc.querySelectorAll(selector);
+      
+      for (const element of elements) {
+        const text = element.textContent?.trim();
+        if (!text) continue;
+
+        // Score based on deadline-related keywords
+        let score = 0;
+        const lowerText = text.toLowerCase();
+        
+        if (lowerText.includes('deadline')) score += 10;
+        if (lowerText.includes('submission')) score += 8;
+        if (lowerText.includes('due')) score += 7;
+        if (lowerText.includes('closes')) score += 6;
+        if (lowerText.includes('ends')) score += 5;
+        
+        // Check for date patterns
+        const datePatterns = [
+          /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}/i,
+          /\d{1,2}\/\d{1,2}\/\d{4}/,
+          /\d{4}-\d{2}-\d{2}/
+        ];
+        
+        let hasDatePattern = false;
+        for (const pattern of datePatterns) {
+          if (pattern.test(text)) {
+            hasDatePattern = true;
+            score += 5;
+            break;
+          }
+        }
+        
+        // Check for time patterns
+        if (/@\s*\d{1,2}:\d{2}[ap]m/i.test(text)) score += 3;
+        if (/\d{1,2}:\d{2}[ap]m/i.test(text)) score += 2;
+        
+        // Check for timezone
+        if (/GMT[+-]\d|UTC[+-]\d|[A-Z]{3,4}/i.test(text)) score += 2;
+        
+        if (hasDatePattern && score > bestScore) {
+          bestScore = score;
+          bestMatch = { element, text, score };
         }
       }
     }
 
-    // Look for date patterns in the entire document
-    const dateRegex = /(?:deadline|due|submit|closes?)\s*:?\s*([A-Za-z]+ \d{1,2},? \d{4}(?: @ \d{1,2}:\d{2}[ap]m)?)/gi;
+    if (bestMatch) {
+      const result = this.parseDeadlineText(bestMatch.text);
+      if (result.deadline) {
+        return {
+          deadline: result.deadline,
+          timezone: result.timezone,
+          originalText: bestMatch.text
+        };
+      }
+    }
+
+    // Fallback: Look for any date-like text in the entire document
     const bodyText = doc.body?.textContent || '';
-    const dateMatch = bodyText.match(dateRegex);
+    const deadlineRegex = /(?:deadline|due|submit|closes?|ends?)\s*:?\s*([^.!?]+(?:202\d|202\d))/gi;
+    const matches = Array.from(bodyText.matchAll(deadlineRegex));
     
-    if (dateMatch && dateMatch[0]) {
-      const parsedDate = this.parseDate(dateMatch[0]);
-      if (parsedDate) {
-        return parsedDate;
+    for (const match of matches) {
+      const result = this.parseDeadlineText(match[1]);
+      if (result.deadline) {
+        return {
+          deadline: result.deadline,
+          timezone: result.timezone,
+          originalText: match[0]
+        };
+      }
+    }
+
+    // Final fallback: Look for any date in the sidebar or key areas
+    const priorityAreas = [
+      doc.querySelector('.sidebar'),
+      doc.querySelector('[class*="event-details"]'),
+      doc.querySelector('[class*="hackathon-info"]'),
+      doc.querySelector('main')
+    ].filter(Boolean);
+
+    for (const area of priorityAreas) {
+      const text = area?.textContent || '';
+      const result = this.parseDeadlineText(text);
+      if (result.deadline) {
+        return {
+          deadline: result.deadline,
+          timezone: result.timezone,
+          originalText: text.substring(0, 100) + '...'
+        };
       }
     }
 
     // Default to 30 days from now if no deadline found
     const defaultDeadline = new Date();
     defaultDeadline.setDate(defaultDeadline.getDate() + 30);
-    return defaultDeadline.toISOString();
+    return {
+      deadline: defaultDeadline.toISOString(),
+      timezone: undefined,
+      originalText: 'Estimated (30 days from import)'
+    };
+  }
+
+  private static parseDeadlineText(text: string): { deadline: string | null; timezone?: string } {
+    if (!text) return { deadline: null };
+
+    // Clean up the text
+    const cleaned = text.replace(/^\s*[^\w]*/, '').replace(/[^\w\s:@+-]*$/, '');
+    
+    // Extract timezone information
+    let timezone = undefined;
+    const timezoneMatch = cleaned.match(/(GMT[+-]\d{1,2}|UTC[+-]\d{1,2}|[A-Z]{3,4}(?:[+-]\d{1,2})?)/i);
+    if (timezoneMatch) {
+      timezone = timezoneMatch[1];
+    }
+
+    // Try various date/time patterns
+    const patterns = [
+      // "Jun 30, 2025 @ 4:00pm GMT-5" format
+      /([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{4})\s*@?\s*(\d{1,2}):(\d{2})\s*([ap]m)?\s*(GMT[+-]\d{1,2}|UTC[+-]\d{1,2}|[A-Z]{3,4})?/i,
+      
+      // "June 30, 2025 at 4:00 PM" format
+      /([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{4})\s+(?:at|@)\s+(\d{1,2}):(\d{2})\s*([ap]m)?/i,
+      
+      // "Jun 30, 2025" format (date only)
+      /([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{4})/i,
+      
+      // "2025-06-30T16:00:00" ISO format
+      /(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/,
+      
+      // "06/30/2025" format
+      /(\d{1,2})\/(\d{1,2})\/(\d{4})/
+    ];
+
+    for (const pattern of patterns) {
+      const match = cleaned.match(pattern);
+      if (match) {
+        try {
+          let dateStr = '';
+          
+          if (pattern.source.includes('([A-Za-z]{3,9})')) {
+            // Month name format
+            const [, month, day, year, hour, minute, ampm, tz] = match;
+            if (tz) timezone = tz;
+            
+            if (hour && minute) {
+              const hour24 = this.convertTo24Hour(hour, ampm);
+              dateStr = `${month} ${day}, ${year} ${hour24}:${minute}:00`;
+            } else {
+              dateStr = `${month} ${day}, ${year} 23:59:59`; // End of day if no time specified
+            }
+          } else if (pattern.source.includes('(\\d{4})-(\\d{2})-(\\d{2})')) {
+            // ISO format
+            const [, year, month, day, hour, minute, second] = match;
+            dateStr = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
+          } else if (pattern.source.includes('(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})')) {
+            // MM/DD/YYYY format
+            const [, month, day, year] = match;
+            dateStr = `${month}/${day}/${year} 23:59:59`;
+          }
+          
+          const date = new Date(dateStr);
+          if (!isNaN(date.getTime())) {
+            return { 
+              deadline: date.toISOString(),
+              timezone 
+            };
+          }
+        } catch (error) {
+          continue;
+        }
+      }
+    }
+    
+    return { deadline: null };
+  }
+
+  private static convertTo24Hour(hour: string, ampm?: string): string {
+    let hour24 = parseInt(hour);
+    if (ampm) {
+      if (ampm.toLowerCase() === 'pm' && hour24 !== 12) {
+        hour24 += 12;
+      } else if (ampm.toLowerCase() === 'am' && hour24 === 12) {
+        hour24 = 0;
+      }
+    }
+    return hour24.toString().padStart(2, '0');
   }
 
   private static extractDates(doc: Document, deadline: string): { startDate: string; endDate: string } {
