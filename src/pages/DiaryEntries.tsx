@@ -336,7 +336,7 @@ const DiaryEntries: React.FC = () => {
 
               {/* Draft Content */}
               <p className="text-gray-600 dark:text-gray-300 mb-4 italic">
-                {draft.content || 'Click edit to create a diary entry for this commit'}
+                {draft.content || 'Click edit to add your thoughts about this commit...'}
               </p>
 
               {/* Commit Info */}

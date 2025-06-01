@@ -135,7 +135,7 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
     // Create the actual entry in the database
     const newEntry = await createEntry({
       title: draft.title || 'Untitled Entry',
-      content: draft.content || `Commit: ${draft.commit_message}`,
+      content: draft.content || '', // Keep content empty if not filled by user
       commit_hash: draft.commit_hash,
       commit_repo: draft.commit_repo,
       is_draft: true,
@@ -169,12 +169,11 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
         // Create temporary draft instead of saving immediately
         const lines = message.split('\n');
         const commitMessage = lines[0] || '';
-        const content = lines.slice(1).filter((line: string) => line.trim()).join('\n').trim();
 
         const temporaryDraft: TemporaryDraft = {
           id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           title: '', // Don't use commit message as title
-          content: content || commitMessage, // Store full commit message in content
+          content: '', // Keep content empty for user to fill
           commit_hash: commitHash,
           commit_repo: repo,
           commit_message: commitMessage,
@@ -288,12 +287,11 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
         // Extract meaningful content from commit message
         const lines = latestCommitData.commit.message.split('\n');
         const commitMessage = lines[0] || '';
-        const content = lines.slice(1).filter((line: string) => line.trim()).join('\n').trim();
 
         const temporaryDraft: TemporaryDraft = {
           id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           title: '', // Don't use commit message as title
-          content: content || commitMessage, // Store full commit message in content
+          content: '', // Keep content empty for user to fill
           commit_hash: latestCommitData.commit.sha,
           commit_repo: latestCommitData.repoName,
           commit_message: commitMessage,
