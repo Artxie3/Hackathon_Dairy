@@ -541,12 +541,20 @@ export class DevpostScraper {
       
       const monthIndex = new Date(`${month} 1, 2025`).getMonth();
       
-      // Create date in the specified timezone
-      const date = new Date(2025, monthIndex, parseInt(day), hours, parseInt(minute), 0, 0);
+      // GMT-5 means we need to ADD 5 hours to convert to UTC
+      // May 30 at 2:15AM GMT-5 = May 30 at 7:15AM UTC
+      // June 30 at 4:00PM GMT-5 = June 30 at 9:00PM UTC
+      const utcHours = hours + 5;
+      let finalDay = parseInt(day);
+      let finalHours = utcHours;
       
-      // Convert to UTC by subtracting the timezone offset
-      const timezoneOffset = this.getTimezoneOffsetHours(timezone);
-      const utcDate = new Date(date.getTime() - (timezoneOffset * 60 * 60 * 1000));
+      // Handle day rollover if hours > 24
+      if (utcHours >= 24) {
+        finalHours = utcHours - 24;
+        finalDay = parseInt(day) + 1;
+      }
+      
+      const utcDate = new Date(Date.UTC(2025, monthIndex, finalDay, finalHours, parseInt(minute), 0, 0));
       
       console.log('Created UTC date:', utcDate);
       return utcDate;
