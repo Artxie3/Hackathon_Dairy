@@ -205,6 +205,23 @@
   margin-left: 1rem;
 }
 
+/* Hackathon Card */
+.hackathon-card {
+  grid-column: span 1;
+  grid-row: span 1;
+  padding: 0; /* Remove padding since HackathonDeadlines has its own */
+}
+
+.hackathon-card .hackathon-deadlines-container {
+  box-shadow: none; /* Remove duplicate shadow */
+  padding: 1.25rem; /* Match dashboard card padding */
+  background: transparent; /* Use parent background */
+}
+
+.dark-theme .hackathon-card .hackathon-deadlines-container {
+  background: transparent;
+}
+
 /* Calendar Card */
 .calendar-card {
   grid-column: span 3;
@@ -343,83 +360,6 @@
   display: block;
 }
 
-/* Listening Card */
-.listening-card {
-  grid-column: span 1;
-}
-
-.listening-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.listening-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  border-radius: 0.5rem;
-  background-color: var(--color-gray-100);
-  transition: background-color 0.2s ease;
-}
-
-.dark-theme .listening-item {
-  background-color: var(--color-gray-800);
-}
-
-.listening-item:hover {
-  background-color: var(--color-gray-200);
-}
-
-.dark-theme .listening-item:hover {
-  background-color: var(--color-gray-700);
-}
-
-.listening-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background-color: var(--color-accent-light);
-  color: var(--color-accent-dark);
-}
-
-.listening-info h3 {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--color-gray-900);
-  margin-bottom: 0.25rem;
-}
-
-.dark-theme .listening-info h3 {
-  color: var(--color-gray-100);
-}
-
-.listening-meta {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.listening-platform,
-.listening-duration {
-  font-size: 0.75rem;
-  color: var(--color-gray-500);
-}
-
-.listening-platform {
-  padding: 0.125rem 0.375rem;
-  background-color: var(--color-gray-200);
-  border-radius: 0.25rem;
-}
-
-.dark-theme .listening-platform {
-  background-color: var(--color-gray-700);
-}
-
 @media (max-width: 1024px) {
   .dashboard-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -434,7 +374,7 @@
   }
   
   .recent-commits-card,
-  .listening-card {
+  .hackathon-card {
     grid-column: span 1;
   }
 }
@@ -447,7 +387,7 @@
   .stats-card,
   .recent-commits-card,
   .calendar-card,
-  .listening-card {
+  .hackathon-card {
     grid-column: span 1;
   }
   

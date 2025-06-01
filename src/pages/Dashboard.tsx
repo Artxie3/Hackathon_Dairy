@@ -3,8 +3,10 @@ import { Calendar as CalendarIcon, Clock, Github, ExternalLink, Headphones, Musi
 import { useAuth } from '../contexts/AuthContext';
 import { useDashboard } from '../contexts/DashboardContext';
 import Calendar from '../components/Calendar';
+import HackathonDeadlines from '../components/HackathonDeadlines';
 import '../styles/Dashboard.css';
 import '../styles/Calendar.css';
+import '../styles/HackathonDeadlines.css';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
@@ -48,12 +50,6 @@ const Dashboard: React.FC = () => {
     console.log('Clicked date:', date);
     // You could implement navigation to diary page with date filter here
   };
-
-  // Mock data for listening history (can be extended later)
-  const listeningHistory = [
-    { id: 1, title: 'Lofi Hip Hop Mix', platform: 'YouTube', duration: '2h 15m' },
-    { id: 2, title: 'Coding Playlist', platform: 'Spotify', duration: '1h 45m' },
-  ];
   
   return (
     <div className="dashboard">
@@ -186,6 +182,11 @@ const Dashboard: React.FC = () => {
             )}
           </ul>
         </div>
+
+        {/* Hackathon Deadlines */}
+        <div className="dashboard-card hackathon-card">
+          <HackathonDeadlines />
+        </div>
         
         {/* Calendar Widget */}
         <div className="dashboard-card calendar-card">
@@ -195,33 +196,6 @@ const Dashboard: React.FC = () => {
           </div>
           <div style={{ marginTop: '1rem' }}>
             <Calendar onDateClick={handleDateClick} />
-          </div>
-        </div>
-        
-        {/* Listening History */}
-        <div className="dashboard-card listening-card">
-          <div className="card-header">
-            <h2>Listening While Coding</h2>
-            <Music size={18} />
-          </div>
-          <div className="listening-list">
-            {listeningHistory.map(item => (
-              <div key={item.id} className="listening-item">
-                <div className="listening-icon">
-                  {item.platform === 'YouTube' ? 
-                    <ExternalLink size={16} /> : 
-                    <Music size={16} />
-                  }
-                </div>
-                <div className="listening-info">
-                  <h3>{item.title}</h3>
-                  <div className="listening-meta">
-                    <span className="listening-platform">{item.platform}</span>
-                    <span className="listening-duration">{item.duration}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </div>
