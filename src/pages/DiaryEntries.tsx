@@ -301,6 +301,9 @@ const DiaryEntries: React.FC = () => {
                         month: 'short',
                         day: 'numeric',
                         year: 'numeric',
+                      })} at {new Date(draft.created_at).toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit',
                       })}
                     </span>
                     <span className="px-2 py-1 bg-blue-500 text-white rounded-full text-xs font-medium">
@@ -308,7 +311,7 @@ const DiaryEntries: React.FC = () => {
                     </span>
                   </div>
                   <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                    {draft.title || 'Untitled commit'}
+                    {draft.title || 'Untitled Entry'}
                   </h2>
                 </div>
                 
@@ -338,6 +341,12 @@ const DiaryEntries: React.FC = () => {
 
               {/* Commit Info */}
               <div className="mb-4 p-3 bg-white/70 dark:bg-gray-700/70 rounded-lg">
+                {/* Commit Message */}
+                {draft.commit_message && (
+                  <div className="mb-3 text-sm text-gray-800 dark:text-gray-200 font-medium">
+                    "{draft.commit_message}"
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
                     <GitBranch size={14} />
@@ -392,6 +401,9 @@ const DiaryEntries: React.FC = () => {
                         month: 'short',
                         day: 'numeric',
                         year: 'numeric',
+                      })} at {new Date(entry.created_at).toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit',
                       })}
                     </span>
                     {entry.mood && (

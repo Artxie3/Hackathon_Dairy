@@ -8,6 +8,7 @@ interface TemporaryDraft {
   content: string;
   commit_hash: string;
   commit_repo: string;
+  commit_message: string;
   created_at: string;
   tags: string[];
   isTemporary: true;
@@ -134,7 +135,7 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
     // Create the actual entry in the database
     const newEntry = await createEntry({
       title: draft.title || 'Untitled Entry',
-      content: draft.content,
+      content: draft.content || `Commit: ${draft.commit_message}`,
       commit_hash: draft.commit_hash,
       commit_repo: draft.commit_repo,
       is_draft: true,
@@ -163,36 +164,18 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
       if (!existingEntry && !existingDraft) {
         // Create temporary draft instead of saving immediately
         const lines = message.split('\n');
-        const title = lines[0] || '';
+        const commitMessage = lines[0] || '';
         const content = lines.slice(1).filter((line: string) => line.trim()).join('\n').trim();
-
-        const tags = ['commit', 'auto-generated'];
-        const messageText = message.toLowerCase();
-        
-        if (messageText.includes('fix') || messageText.includes('bug')) {
-          tags.push('bug-fix');
-        }
-        if (messageText.includes('feat') || messageText.includes('feature')) {
-          tags.push('feature');
-        }
-        if (messageText.includes('refactor')) {
-          tags.push('refactor');
-        }
-        if (messageText.includes('test')) {
-          tags.push('testing');
-        }
-        if (messageText.includes('doc')) {
-          tags.push('documentation');
-        }
 
         const temporaryDraft: TemporaryDraft = {
           id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          title,
-          content,
+          title: '', // Don't use commit message as title
+          content: content || commitMessage, // Store full commit message in content
           commit_hash: commitHash,
           commit_repo: repo,
+          commit_message: commitMessage,
           created_at: new Date().toISOString(),
-          tags,
+          tags: ['commit'], // Only add "commit" tag
           isTemporary: true,
         };
 
@@ -278,37 +261,18 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
             
             // Extract meaningful content from commit message
             const lines = commit.message.split('\n');
-            const title = lines[0] || '';
+            const commitMessage = lines[0] || '';
             const content = lines.slice(1).filter((line: string) => line.trim()).join('\n').trim();
-
-            // Determine tags based on commit message
-            const tags = ['commit', 'auto-generated'];
-            const message = commit.message.toLowerCase();
-            
-            if (message.includes('fix') || message.includes('bug')) {
-              tags.push('bug-fix');
-            }
-            if (message.includes('feat') || message.includes('feature')) {
-              tags.push('feature');
-            }
-            if (message.includes('refactor')) {
-              tags.push('refactor');
-            }
-            if (message.includes('test')) {
-              tags.push('testing');
-            }
-            if (message.includes('doc')) {
-              tags.push('documentation');
-            }
 
             const temporaryDraft: TemporaryDraft = {
               id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              title,
-              content,
+              title: '', // Don't use commit message as title
+              content: content || commitMessage, // Store full commit message in content
               commit_hash: commit.sha,
               commit_repo: repoName,
+              commit_message: commitMessage,
               created_at: created_at,
-              tags,
+              tags: ['commit'], // Only add "commit" tag
               isTemporary: true,
             };
 
