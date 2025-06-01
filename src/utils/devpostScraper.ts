@@ -26,75 +26,82 @@ export class DevpostScraper {
         throw new Error('Please provide a valid Devpost URL');
       }
 
-      let htmlContent = '';
+      // Clean up URL and get dates URL
+      const cleanUrl = devpostUrl.replace(/\/$/, '');
+      const datesUrl = `${cleanUrl}/details/dates`;
+
+      let mainHtmlContent = '';
+      let datesHtmlContent = '';
       let proxyError = null;
 
       // Try each CORS proxy in sequence until one works
       for (const proxy of this.CORS_PROXIES) {
         try {
-          const proxyUrl = `${proxy}${encodeURIComponent(devpostUrl)}`;
-          const response = await fetch(proxyUrl);
+          // Fetch main page
+          const mainProxyUrl = `${proxy}${encodeURIComponent(cleanUrl)}`;
+          const mainResponse = await fetch(mainProxyUrl);
           
-          if (!response.ok) {
-            continue; // Try next proxy if this one fails
+          if (!mainResponse.ok) {
+            continue;
+          }
+
+          // Fetch dates page
+          const datesProxyUrl = `${proxy}${encodeURIComponent(datesUrl)}`;
+          const datesResponse = await fetch(datesProxyUrl);
+
+          if (!datesResponse.ok) {
+            continue;
           }
 
           // Handle different proxy response formats
           if (proxy.includes('allorigins')) {
-            const data = await response.json();
-            htmlContent = data.contents;
+            const mainData = await mainResponse.json();
+            const datesData = await datesResponse.json();
+            mainHtmlContent = mainData.contents;
+            datesHtmlContent = datesData.contents;
           } else {
-            htmlContent = await response.text();
+            mainHtmlContent = await mainResponse.text();
+            datesHtmlContent = await datesResponse.text();
           }
 
-          if (htmlContent) {
-            break; // Successfully got content, exit loop
+          if (mainHtmlContent && datesHtmlContent) {
+            break;
           }
         } catch (err) {
           proxyError = err;
-          continue; // Try next proxy
+          continue;
         }
       }
 
-      if (!htmlContent) {
-        // If all proxies failed, try fallback method
-        console.warn('All CORS proxies failed, using fallback method');
+      if (!mainHtmlContent || !datesHtmlContent) {
+        console.warn('Failed to fetch content, using fallback method');
         return this.extractFromUrl(devpostUrl);
       }
 
-      // Create a DOM parser to extract information
+      // Parse both pages
       const parser = new DOMParser();
-      const doc = parser.parseFromString(htmlContent, 'text/html');
+      const mainDoc = parser.parseFromString(mainHtmlContent, 'text/html');
+      const datesDoc = parser.parseFromString(datesHtmlContent, 'text/html');
       
-      return this.extractHackathonData(doc, devpostUrl);
+      return this.extractHackathonData(mainDoc, datesDoc, devpostUrl);
     } catch (error) {
       console.error('Error scraping Devpost:', error);
-      // Return basic data from URL if scraping fails
       return this.extractFromUrl(devpostUrl);
     }
   }
 
-  private static extractHackathonData(doc: Document, devpostUrl: string): DevpostHackathonData {
-    // Extract title
-    const title = this.extractTitle(doc);
+  private static extractHackathonData(mainDoc: Document, datesDoc: Document, devpostUrl: string): DevpostHackathonData {
+    // Extract title and basic info from main page
+    const title = this.extractTitle(mainDoc);
+    const organizer = this.extractOrganizer(mainDoc);
+    const description = this.extractDescription(mainDoc);
+    const participants = this.extractParticipants(mainDoc);
+
+    // Extract dates from the dates page
+    const dates = this.extractDatesFromSchedule(datesDoc);
     
-    // Extract organizer
-    const organizer = this.extractOrganizer(doc);
-    
-    // Extract description
-    const description = this.extractDescription(doc);
-    
-    // Extract deadline
-    const deadline = this.extractDeadline(doc);
-    
-    // Extract dates (start/end)
-    const dates = this.extractDates(doc, deadline);
-    
-    // Extract participants count
-    const participants = this.extractParticipants(doc);
-    
-    // Determine status based on deadline
-    const status = this.determineStatus(deadline);
+    // Determine status based on dates
+    const status = this.determineStatus(dates.submissionDeadline);
 
     return {
       title,
@@ -102,10 +109,103 @@ export class DevpostScraper {
       description,
       startDate: dates.startDate,
       endDate: dates.endDate,
-      submissionDeadline: deadline,
+      submissionDeadline: dates.submissionDeadline,
       devpostUrl,
       participants,
       status
+    };
+  }
+
+  private static extractDatesFromSchedule(doc: Document): { startDate: string; endDate: string; submissionDeadline: string } {
+    try {
+      // Look for the schedule table
+      const scheduleRows = doc.querySelectorAll('table tr');
+      let submissionsRow = null;
+      let judgingRow = null;
+
+      for (const row of scheduleRows) {
+        const text = row.textContent?.toLowerCase() || '';
+        if (text.includes('submission')) {
+          submissionsRow = row;
+        } else if (text.includes('judging')) {
+          judgingRow = row;
+        }
+      }
+
+      if (submissionsRow) {
+        const cells = submissionsRow.querySelectorAll('td');
+        if (cells.length >= 2) {
+          const beginText = cells[0].textContent?.trim() || '';
+          const endText = cells[1].textContent?.trim() || '';
+
+          // Parse dates considering PDT/EDT timezone
+          const startDate = this.parseDevpostDate(beginText);
+          const endDate = this.parseDevpostDate(endText);
+          const submissionDeadline = endDate;
+
+          if (startDate && endDate) {
+            return {
+              startDate: startDate.toISOString(),
+              endDate: endDate.toISOString(),
+              submissionDeadline: submissionDeadline.toISOString()
+            };
+          }
+        }
+      }
+
+      // Fallback to default date handling
+      return this.getDefaultDates();
+    } catch (error) {
+      console.error('Error parsing schedule:', error);
+      return this.getDefaultDates();
+    }
+  }
+
+  private static parseDevpostDate(dateStr: string): Date | null {
+    try {
+      // Handle various Devpost date formats
+      // Example: "May 30 at 12:15am PDT" or "June 30 at 2:00pm PDT"
+      const regex = /([A-Za-z]+)\s+(\d+)(?:\s+at\s+(\d+):(\d+)(am|pm))?\s*(PDT|EDT)?/i;
+      const match = dateStr.match(regex);
+
+      if (match) {
+        const [_, month, day, hour = '0', minute = '0', ampm = 'am', timezone = 'PDT'] = match;
+        
+        // Convert to 24-hour format
+        let hours = parseInt(hour);
+        if (ampm.toLowerCase() === 'pm' && hours < 12) hours += 12;
+        if (ampm.toLowerCase() === 'am' && hours === 12) hours = 0;
+
+        // Create date in local timezone
+        const date = new Date();
+        date.setMonth(new Date(`${month} 1`).getMonth());
+        date.setDate(parseInt(day));
+        date.setHours(hours, parseInt(minute), 0, 0);
+
+        // Adjust for timezone if needed
+        if (timezone === 'PDT') {
+          date.setHours(date.getHours() + 3); // PDT is UTC-7
+        } else if (timezone === 'EDT') {
+          date.setHours(date.getHours() + 4); // EDT is UTC-4
+        }
+
+        return date;
+      }
+    } catch (error) {
+      console.error('Error parsing date:', dateStr, error);
+    }
+    return null;
+  }
+
+  private static getDefaultDates(): { startDate: string; endDate: string; submissionDeadline: string } {
+    const now = new Date();
+    const end = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const deadline = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+
+    return {
+      startDate: now.toISOString(),
+      endDate: end.toISOString(),
+      submissionDeadline: deadline.toISOString()
     };
   }
 
@@ -202,87 +302,6 @@ export class DevpostScraper {
     return 'No description available';
   }
 
-  private static extractDeadline(doc: Document): string {
-    // Look for deadline information
-    const deadlineSelectors = [
-      '[data-testid="deadline"]',
-      '.deadline',
-      '.submission-deadline',
-      '[class*="deadline"]',
-      '[class*="due"]'
-    ];
-
-    for (const selector of deadlineSelectors) {
-      const element = doc.querySelector(selector);
-      if (element?.textContent?.trim()) {
-        const dateStr = element.textContent.trim();
-        const parsedDate = this.parseDate(dateStr);
-        if (parsedDate) {
-          return parsedDate;
-        }
-      }
-    }
-
-    // Look for date patterns in the entire document
-    const dateRegex = /(?:deadline|due|submit|closes?)\s*:?\s*([A-Za-z]+ \d{1,2},? \d{4}(?: @ \d{1,2}:\d{2}[ap]m)?)/gi;
-    const bodyText = doc.body?.textContent || '';
-    const dateMatch = bodyText.match(dateRegex);
-    
-    if (dateMatch && dateMatch[0]) {
-      const parsedDate = this.parseDate(dateMatch[0]);
-      if (parsedDate) {
-        return parsedDate;
-      }
-    }
-
-    // Default to 30 days from now if no deadline found
-    const defaultDeadline = new Date();
-    defaultDeadline.setDate(defaultDeadline.getDate() + 30);
-    return defaultDeadline.toISOString();
-  }
-
-  private static extractDates(doc: Document, deadline: string): { startDate: string; endDate: string } {
-    // Try to find start and end dates
-    const dateElements = doc.querySelectorAll('[class*="date"], [data-testid*="date"]');
-    
-    const dates: Date[] = [];
-    
-    dateElements.forEach(element => {
-      const dateStr = element.textContent?.trim();
-      if (dateStr) {
-        const parsed = this.parseDate(dateStr);
-        if (parsed) {
-          dates.push(new Date(parsed));
-        }
-      }
-    });
-
-    // Sort dates
-    dates.sort((a, b) => a.getTime() - b.getTime());
-    
-    const deadlineDate = new Date(deadline);
-    
-    // If we found dates, use them
-    if (dates.length >= 2) {
-      return {
-        startDate: dates[0].toISOString(),
-        endDate: dates[dates.length - 1].toISOString()
-      };
-    }
-    
-    // Otherwise, estimate based on deadline
-    const startDate = new Date(deadlineDate);
-    startDate.setDate(startDate.getDate() - 30); // Assume 30-day hackathon
-    
-    const endDate = new Date(deadlineDate);
-    endDate.setHours(endDate.getHours() - 1); // End 1 hour before deadline
-    
-    return {
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString()
-    };
-  }
-
   private static extractParticipants(doc: Document): number | undefined {
     const bodyText = doc.body?.textContent || '';
     const participantMatch = bodyText.match(/(\d+)\s*participants?/i);
@@ -292,36 +311,6 @@ export class DevpostScraper {
     }
     
     return undefined;
-  }
-
-  private static parseDate(dateStr: string): string | null {
-    try {
-      // Clean up the date string
-      const cleaned = dateStr.replace(/^[^A-Za-z\d]*/, '').replace(/[^A-Za-z\d\s:@,-]*$/, '');
-      
-      // Try to parse various date formats
-      const date = new Date(cleaned);
-      
-      if (!isNaN(date.getTime())) {
-        return date.toISOString();
-      }
-      
-      // Try alternative parsing for "Jun 30, 2025 @ 4:00pm" format
-      const altMatch = cleaned.match(/([A-Za-z]+ \d{1,2},? \d{4})(?: @ (\d{1,2}:\d{2}[ap]m))?/);
-      if (altMatch) {
-        const dateStr = altMatch[1];
-        const timeStr = altMatch[2] || '11:59pm';
-        
-        const parsedDate = new Date(`${dateStr} ${timeStr}`);
-        if (!isNaN(parsedDate.getTime())) {
-          return parsedDate.toISOString();
-        }
-      }
-      
-      return null;
-    } catch (error) {
-      return null;
-    }
   }
 
   private static determineStatus(deadline: string): 'upcoming' | 'ongoing' | 'completed' {

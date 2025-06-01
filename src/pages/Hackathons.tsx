@@ -39,6 +39,7 @@ const Hackathons: React.FC = () => {
     technologies: [],
     notes: '',
   });
+  const [hackathonToDelete, setHackathonToDelete] = useState<Hackathon | null>(null);
 
   const upcomingDeadlines = getUpcomingDeadlines();
   const ongoingHackathons = getOngoingHackathons();
@@ -99,16 +100,14 @@ const Hackathons: React.FC = () => {
   };
 
   const handleDelete = async (hackathon: Hackathon) => {
-    // Create and style a custom confirmation dialog
-    const confirmDelete = () => {
-      const result = window.confirm(
-        `Are you sure you want to delete "${hackathon.title}"?\n\nThis action cannot be undone.`
-      );
-      if (result) {
-        deleteHackathon(hackathon.id);
-      }
-    };
-    confirmDelete();
+    setHackathonToDelete(hackathon);
+  };
+
+  const confirmDelete = async () => {
+    if (hackathonToDelete) {
+      await deleteHackathon(hackathonToDelete.id);
+      setHackathonToDelete(null);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -572,6 +571,34 @@ const Hackathons: React.FC = () => {
               Add Your First Hackathon
             </button>
           )}
+        </div>
+      )}
+
+      {/* Confirmation Dialog */}
+      {hackathonToDelete && (
+        <div className="confirmation-dialog">
+          <div className="confirmation-dialog-content">
+            <h3>Delete Hackathon</h3>
+            <p>
+              Are you sure you want to delete "{hackathonToDelete.title}"?
+              <br />
+              This action cannot be undone.
+            </p>
+            <div className="confirmation-actions">
+              <button
+                className="confirmation-btn cancel"
+                onClick={() => setHackathonToDelete(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="confirmation-btn delete"
+                onClick={confirmDelete}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
