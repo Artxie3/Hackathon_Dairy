@@ -1,59 +1,60 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-
-interface Settings {
-  timezone: string;
-  darkMode: boolean;
-  // Add more settings as needed
-}
+import { useAuth } from './AuthContext';
 
 interface SettingsContextType {
   timezone: string;
-  darkMode: boolean;
-  updateSettings: (settings: Partial<Settings>) => void;
+  setTimezone: (timezone: string) => void;
 }
 
-const defaultSettings: Settings = {
-  timezone: 'GMT-5', // Default to hackathon timezone
-  darkMode: false,
-};
+const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
-const SettingsContext = createContext<SettingsContextType>({
-  ...defaultSettings,
-  updateSettings: () => {},
-});
+export function SettingsProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  const [timezone, setTimezoneState] = useState<string>('GMT-5');
 
-export const useSettings = () => useContext(SettingsContext);
-
-export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [settings, setSettings] = useState<Settings>(() => {
-    // Load settings from localStorage on initial render
-    const savedSettings = localStorage.getItem('journal_settings');
-    if (savedSettings) {
-      return JSON.parse(savedSettings);
-    }
-    return defaultSettings;
-  });
-
+  // Load settings from localStorage
   useEffect(() => {
-    // Save settings to localStorage whenever they change
-    localStorage.setItem('journal_settings', JSON.stringify(settings));
-  }, [settings]);
+    if (!user?.username) return;
 
-  const updateSettings = (newSettings: Partial<Settings>) => {
-    setSettings(prev => ({
-      ...prev,
-      ...newSettings,
-    }));
+    const savedSettings = localStorage.getItem(`settings_${user.username}`);
+    if (savedSettings) {
+      try {
+        const parsed = JSON.parse(savedSettings);
+        if (parsed.timezone) {
+          setTimezoneState(parsed.timezone);
+        }
+      } catch (error) {
+        console.error('Error loading settings:', error);
+      }
+    }
+  }, [user?.username]);
+
+  // Save settings to localStorage whenever they change
+  useEffect(() => {
+    if (user?.username) {
+      const settings = { timezone };
+      localStorage.setItem(`settings_${user.username}`, JSON.stringify(settings));
+    }
+  }, [timezone, user?.username]);
+
+  const setTimezone = (newTimezone: string) => {
+    setTimezoneState(newTimezone);
   };
 
   return (
-    <SettingsContext.Provider
-      value={{
-        ...settings,
-        updateSettings,
-      }}
-    >
+    <SettingsContext.Provider value={{
+      timezone,
+      setTimezone,
+    }}>
       {children}
     </SettingsContext.Provider>
   );
-}; 
+}
+
+export function useSettings() {
+  const context = useContext(SettingsContext);
+  if (context === undefined) {
+    throw new Error('useSettings must be used within a SettingsProvider');
+  }
+  return context;
+} 

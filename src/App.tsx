@@ -22,8 +22,8 @@ import './App.css';
 
 function App() {
   return (
-    <SettingsProvider>
-      <AuthProvider>
+    <AuthProvider>
+      <SettingsProvider>
         <ThemeProvider>
           <NotificationProvider>
             <DiaryProvider>
@@ -52,8 +52,8 @@ function App() {
             </DiaryProvider>
           </NotificationProvider>
         </ThemeProvider>
-      </AuthProvider>
-    </SettingsProvider>
+      </SettingsProvider>
+    </AuthProvider>
   );
 }
 
