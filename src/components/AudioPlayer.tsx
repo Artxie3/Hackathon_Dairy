@@ -8,97 +8,97 @@ interface AudioPlayerProps {
 
 export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, className = '' }) => {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(1);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const progressRef = useRef<HTMLDivElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const updateTime = () => setCurrentTime(audio.currentTime);
-    const updateDuration = () => {
+    const handleLoadedMetadata = () => {
       setDuration(audio.duration);
       setIsLoading(false);
     };
-    const handleEnded = () => setIsPlaying(false);
-    const handleLoadStart = () => setIsLoading(true);
-    const handleCanPlay = () => setIsLoading(false);
 
-    audio.addEventListener('timeupdate', updateTime);
-    audio.addEventListener('loadedmetadata', updateDuration);
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+    };
+
+    const handleEnded = () => {
+      setIsPlaying(false);
+      setCurrentTime(0);
+    };
+
+    const handleCanPlay = () => {
+      setIsLoading(false);
+    };
+
+    const handleError = () => {
+      setIsLoading(false);
+      console.error('Error loading audio file');
+    };
+
+    // Add event listeners
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
-    audio.addEventListener('loadstart', handleLoadStart);
     audio.addEventListener('canplay', handleCanPlay);
+    audio.addEventListener('error', handleError);
 
     return () => {
-      audio.removeEventListener('timeupdate', updateTime);
-      audio.removeEventListener('loadedmetadata', updateDuration);
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
-      audio.removeEventListener('loadstart', handleLoadStart);
       audio.removeEventListener('canplay', handleCanPlay);
+      audio.removeEventListener('error', handleError);
     };
   }, [src]);
 
   const togglePlay = async () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
+    if (!audioRef.current) return;
+    
     try {
       if (isPlaying) {
-        audio.pause();
+        audioRef.current.pause();
         setIsPlaying(false);
       } else {
-        await audio.play();
+        await audioRef.current.play();
         setIsPlaying(true);
       }
     } catch (error) {
       console.error('Error playing audio:', error);
+      setIsPlaying(false);
     }
-  };
-
-  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const audio = audioRef.current;
-    const progressBar = progressRef.current;
-    if (!audio || !progressBar || !duration) return;
-
-    const rect = progressBar.getBoundingClientRect();
-    const clickPosition = (e.clientX - rect.left) / rect.width;
-    const newTime = clickPosition * duration;
-    
-    audio.currentTime = newTime;
-    setCurrentTime(newTime);
   };
 
   const toggleMute = () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    if (isMuted) {
-      audio.volume = volume;
-      setIsMuted(false);
-    } else {
-      audio.volume = 0;
-      setIsMuted(true);
-    }
+    if (!audioRef.current) return;
+    
+    const newMutedState = !isMuted;
+    audioRef.current.muted = newMutedState;
+    setIsMuted(newMutedState);
   };
 
-  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const audio = audioRef.current;
-    if (!audio) return;
+  const handleProgressClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!audioRef.current || !progressBarRef.current || !duration) return;
 
-    const newVolume = parseFloat(e.target.value);
-    setVolume(newVolume);
-    audio.volume = newVolume;
-    setIsMuted(newVolume === 0);
+    const progressBar = progressBarRef.current;
+    const rect = progressBar.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const width = rect.width;
+    const percentage = Math.max(0, Math.min(1, x / width));
+    const newTime = percentage * duration;
+
+    audioRef.current.currentTime = newTime;
+    setCurrentTime(newTime);
   };
 
-  const formatTime = (time: number): string => {
-    if (isNaN(time)) return '0:00';
+  const formatTime = (time: number) => {
+    if (!isFinite(time) || isNaN(time)) return '0:00';
     
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
@@ -108,74 +108,73 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, className = '' })
   const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className={`bg-gray-50 dark:bg-gray-700 rounded-lg p-4 ${className}`}>
+    <div className={`flex items-center gap-3 w-full min-w-0 ${className}`}>
       <audio ref={audioRef} src={src} preload="metadata" />
       
-      <div className="flex items-center gap-3">
-        {/* Play/Pause Button */}
-        <button
-          onClick={togglePlay}
-          disabled={isLoading}
-          className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white flex items-center justify-center transition-colors"
-          title={isPlaying ? 'Pause' : 'Play'}
-        >
-          {isLoading ? (
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : isPlaying ? (
-            <Pause size={16} />
-          ) : (
-            <Play size={16} className="ml-0.5" />
-          )}
-        </button>
+      {/* Play/Pause Button */}
+      <button
+        onClick={togglePlay}
+        disabled={isLoading}
+        className="flex-shrink-0 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+        title={isPlaying ? 'Pause' : 'Play'}
+      >
+        {isLoading ? (
+          <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-gray-600"></div>
+        ) : isPlaying ? (
+          <Pause size={18} />
+        ) : (
+          <Play size={18} />
+        )}
+      </button>
+
+      {/* Progress Bar Container */}
+      <div className="flex-1 min-w-0 flex items-center gap-2">
+        {/* Time Display */}
+        <span className="text-xs text-gray-500 dark:text-gray-400 font-mono whitespace-nowrap">
+          {formatTime(currentTime)}
+        </span>
 
         {/* Progress Bar */}
-        <div className="flex-1 flex items-center gap-3">
-          <span className="text-xs font-mono text-gray-600 dark:text-gray-300 min-w-[40px]">
-            {formatTime(currentTime)}
-          </span>
+        <div 
+          ref={progressBarRef}
+          className="flex-1 relative h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full cursor-pointer hover:h-2 transition-all duration-150"
+          onClick={handleProgressClick}
+        >
+          {/* Progress Fill */}
+          <div 
+            className="absolute h-full bg-blue-500 dark:bg-blue-400 rounded-full transition-all duration-100 ease-out"
+            style={{ 
+              width: `${Math.min(100, Math.max(0, progressPercentage))}%`,
+              transition: isPlaying ? 'none' : 'width 0.1s ease-out'
+            }}
+          />
           
-          <div
-            ref={progressRef}
-            className="flex-1 h-2 bg-gray-200 dark:bg-gray-600 rounded-full cursor-pointer relative overflow-hidden"
-            onClick={handleProgressClick}
-          >
-            <div
-              className="h-full bg-blue-500 rounded-full transition-all duration-100 ease-out"
-              style={{ width: `${progressPercentage}%` }}
+          {/* Progress Thumb */}
+          {progressPercentage > 0 && (
+            <div 
+              className="absolute w-3 h-3 bg-blue-500 dark:bg-blue-400 rounded-full transform -translate-y-1/2 -translate-x-1/2 opacity-0 hover:opacity-100 transition-opacity duration-150"
+              style={{ 
+                left: `${Math.min(100, Math.max(0, progressPercentage))}%`,
+                top: '50%'
+              }}
             />
-            
-            {/* Hover indicator */}
-            <div className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity">
-              <div className="h-full bg-blue-300 dark:bg-blue-400 opacity-30 rounded-full pointer-events-none" />
-            </div>
-          </div>
-          
-          <span className="text-xs font-mono text-gray-600 dark:text-gray-300 min-w-[40px]">
-            {formatTime(duration)}
-          </span>
+          )}
         </div>
 
-        {/* Volume Control */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={toggleMute}
-            className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-            title={isMuted ? 'Unmute' : 'Mute'}
-          >
-            {isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
-          </button>
-          
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.1"
-            value={isMuted ? 0 : volume}
-            onChange={handleVolumeChange}
-            className="w-16 h-1 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
-          />
-        </div>
+        {/* Duration */}
+        <span className="text-xs text-gray-500 dark:text-gray-400 font-mono whitespace-nowrap">
+          {formatTime(duration)}
+        </span>
       </div>
+
+      {/* Mute Button */}
+      <button
+        onClick={toggleMute}
+        className="flex-shrink-0 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+        title={isMuted ? 'Unmute' : 'Mute'}
+      >
+        {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+      </button>
     </div>
   );
 }; 
