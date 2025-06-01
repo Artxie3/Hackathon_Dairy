@@ -33,7 +33,6 @@ const Hackathons: React.FC = () => {
     startDate: '',
     endDate: '',
     submissionDeadline: '',
-    status: 'upcoming',
     devpostUrl: '',
     projectTitle: '',
     projectDescription: '',
@@ -62,13 +61,55 @@ const Hackathons: React.FC = () => {
     }
   };
 
+  // Add function to automatically determine status
+  const determineHackathonStatus = (startDate: string, endDate: string, submissionDeadline: string): 'upcoming' | 'ongoing' | 'completed' | 'submitted' => {
+    const now = new Date();
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const deadline = new Date(submissionDeadline);
+    
+    // If submission deadline has passed, it's completed
+    if (deadline < now) {
+      return 'completed';
+    }
+    
+    // If hackathon has started but not ended, it's ongoing
+    if (start <= now && end >= now) {
+      return 'ongoing';
+    }
+    
+    // If hackathon hasn't started yet, it's upcoming
+    if (start > now) {
+      return 'upcoming';
+    }
+    
+    // If hackathon has ended but deadline hasn't passed yet, still ongoing (submission period)
+    if (end < now && deadline >= now) {
+      return 'ongoing';
+    }
+    
+    return 'upcoming';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Auto-determine status based on dates
+      const autoStatus = determineHackathonStatus(
+        formData.startDate || '',
+        formData.endDate || '',
+        formData.submissionDeadline || ''
+      );
+
+      const hackathonData = {
+        ...formData,
+        status: autoStatus
+      };
+
       if (editingHackathon) {
-        await updateHackathon(editingHackathon.id, formData);
+        await updateHackathon(editingHackathon.id, hackathonData);
       } else {
-        await addHackathon(formData as Omit<Hackathon, 'id' | 'created_at' | 'updated_at'>);
+        await addHackathon(hackathonData as Omit<Hackathon, 'id' | 'created_at' | 'updated_at'>);
       }
       resetForm();
     } catch (err) {
@@ -83,7 +124,6 @@ const Hackathons: React.FC = () => {
       startDate: '',
       endDate: '',
       submissionDeadline: '',
-      status: 'upcoming',
       devpostUrl: '',
       projectTitle: '',
       projectDescription: '',
@@ -94,6 +134,7 @@ const Hackathons: React.FC = () => {
     });
     setIsCreating(false);
     setEditingHackathon(null);
+    setImportedTimezone(null);
   };
 
   const handleEdit = (hackathon: Hackathon) => {
@@ -537,16 +578,22 @@ const Hackathons: React.FC = () => {
                   )}
                 </div>
                 <div className="form-group">
-                  <label>Status</label>
-                  <select
-                    value={formData.status || 'upcoming'}
-                    onChange={(e) => setFormData({...formData, status: e.target.value as any})}
-                  >
-                    <option value="upcoming">Upcoming</option>
-                    <option value="ongoing">Ongoing</option>
-                    <option value="completed">Completed</option>
-                    <option value="submitted">Submitted</option>
-                  </select>
+                  <label>Status (Auto-determined)</label>
+                  <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded border">
+                    <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                      formData.startDate && formData.endDate && formData.submissionDeadline
+                        ? getStatusColor(determineHackathonStatus(formData.startDate, formData.endDate, formData.submissionDeadline))
+                        : 'bg-gray-200 text-gray-600'
+                    }`}>
+                      {formData.startDate && formData.endDate && formData.submissionDeadline
+                        ? determineHackathonStatus(formData.startDate, formData.endDate, formData.submissionDeadline)
+                        : 'Enter dates to see status'
+                      }
+                    </span>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Status is automatically determined based on current time vs hackathon dates
+                    </p>
+                  </div>
                 </div>
               </div>
 

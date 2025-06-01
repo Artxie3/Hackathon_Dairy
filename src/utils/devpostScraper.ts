@@ -99,8 +99,8 @@ export class DevpostScraper {
     // Extract dates from the dates page and detect timezone
     const dateResult = this.extractDatesFromSchedule(datesDoc);
     
-    // Determine status based on dates
-    const status = this.determineStatus(dateResult.submissionDeadline);
+    // Determine status based on all dates
+    const status = this.determineStatus(dateResult.startDate, dateResult.endDate, dateResult.submissionDeadline);
 
     return {
       title,
@@ -191,14 +191,16 @@ export class DevpostScraper {
         if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
         if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
 
-        // Create date for 2025 and set UTC time based on timezone offset
-        const timezoneOffset = this.getTimezoneOffset(timezone);
-        const date = new Date(2025, new Date(`${month} 1, 2025`).getMonth(), parseInt(day));
+        // Create date for 2025 in GMT-5 timezone
+        const monthNumber = new Date(`${month} 1, 2025`).getMonth();
         
-        // Set UTC time by adding the timezone offset
-        date.setUTCHours(hours + timezoneOffset, parseInt(minute), 0, 0);
+        // Create date in GMT-5 timezone (which is UTC-5)
+        // GMT-5 means 5 hours behind UTC, so we need to ADD 5 hours to get UTC
+        const utcDate = new Date(Date.UTC(2025, monthNumber, parseInt(day), hours + 5, parseInt(minute), 0, 0));
 
-        return date;
+        console.log(`Parsing: ${dateStr} -> ${month} ${day}, 2025 ${hours}:${minute} GMT-5 -> UTC: ${utcDate.toISOString()}`);
+
+        return utcDate;
       }
     } catch (error) {
       console.error('Error parsing date:', dateStr, error);
@@ -207,7 +209,8 @@ export class DevpostScraper {
   }
 
   private static getTimezoneOffset(timezone: string): number {
-    // Convert timezone string to offset hours
+    // This method is no longer needed with the new parsing logic
+    // but keeping for backwards compatibility
     const match = timezone.match(/GMT([+-])(\d+)/);
     if (match) {
       const sign = match[1] === '+' ? -1 : 1; // Reverse for UTC offset
@@ -306,19 +309,36 @@ export class DevpostScraper {
     return undefined;
   }
 
-  private static determineStatus(deadline: string): 'upcoming' | 'ongoing' | 'completed' {
-    const deadlineDate = new Date(deadline);
+  private static determineStatus(startDate: string, endDate: string, submissionDeadline: string): 'upcoming' | 'ongoing' | 'completed' {
     const now = new Date();
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const deadline = new Date(submissionDeadline);
     
-    if (deadlineDate < now) {
+    console.log('Status determination:', { 
+      now: now.toISOString(), 
+      start: start.toISOString(), 
+      end: end.toISOString(), 
+      deadline: deadline.toISOString() 
+    });
+    
+    // If submission deadline has passed, it's completed
+    if (deadline < now) {
       return 'completed';
     }
     
-    // Assume hackathon is ongoing if deadline is within next 30 days
-    const thirtyDaysFromNow = new Date();
-    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+    // If hackathon has started but not ended, it's ongoing
+    if (start <= now && end >= now) {
+      return 'ongoing';
+    }
     
-    if (deadlineDate <= thirtyDaysFromNow) {
+    // If hackathon hasn't started yet, it's upcoming
+    if (start > now) {
+      return 'upcoming';
+    }
+    
+    // If hackathon has ended but deadline hasn't passed yet, still ongoing (submission period)
+    if (end < now && deadline >= now) {
       return 'ongoing';
     }
     
