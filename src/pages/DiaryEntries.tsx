@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, Filter, X, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Filter, X, Edit, Trash2, GitBranch, RefreshCw } from 'lucide-react';
 import { useDiary } from '../contexts/DiaryContext';
 import { EntryEditor } from '../components/EntryEditor';
 import { AudioPlayer } from '../components/AudioPlayer';
@@ -7,7 +7,17 @@ import { DiaryEntry } from '../utils/supabase';
 import '../styles/DiaryEntries.css';
 
 const DiaryEntries: React.FC = () => {
-  const { entries, loading, error, createEntry, updateEntry, deleteEntry } = useDiary();
+  const { 
+    entries, 
+    loading, 
+    error, 
+    createEntry, 
+    updateEntry, 
+    deleteEntry,
+    syncGitHubCommits,
+    isSyncing,
+    lastSyncTime
+  } = useDiary();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isCreating, setIsCreating] = useState(false);
@@ -82,6 +92,23 @@ const DiaryEntries: React.FC = () => {
     );
   };
 
+  const handleSyncCommits = async () => {
+    await syncGitHubCommits();
+  };
+
+  const formatLastSyncTime = (time: Date | null) => {
+    if (!time) return 'Never';
+    const now = new Date();
+    const diff = now.getTime() - time.getTime();
+    const minutes = Math.floor(diff / 60000);
+    
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return time.toLocaleDateString();
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -108,14 +135,34 @@ const DiaryEntries: React.FC = () => {
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Diary Entries</h1>
-        <button
-          onClick={handleNewEntry}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 transition-colors"
-        >
-          <Plus size={20} />
-          New Entry
-        </button>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Diary Entries</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Last sync: {formatLastSyncTime(lastSyncTime)}
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={handleSyncCommits}
+            disabled={isSyncing}
+            className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Sync GitHub commits"
+          >
+            {isSyncing ? (
+              <RefreshCw className="animate-spin" size={20} />
+            ) : (
+              <GitBranch size={20} />
+            )}
+            {isSyncing ? 'Syncing...' : 'Sync Commits'}
+          </button>
+          <button
+            onClick={handleNewEntry}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 transition-colors"
+          >
+            <Plus size={20} />
+            New Entry
+          </button>
+        </div>
       </div>
 
       {/* Search and Filters */}
@@ -193,7 +240,9 @@ const DiaryEntries: React.FC = () => {
         {filteredEntries.map(entry => (
           <div
             key={entry.id}
-            className="bg-white dark:bg-gray-800 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 border border-gray-200 dark:border-gray-700 overflow-hidden"
+            className={`bg-white dark:bg-gray-800 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 border border-gray-200 dark:border-gray-700 overflow-hidden ${
+              entry.is_draft ? 'border-l-4 border-l-yellow-500' : ''
+            }`}
           >
             {/* Entry Header */}
             <div className="p-6 pb-4">
@@ -209,6 +258,11 @@ const DiaryEntries: React.FC = () => {
                     </span>
                     {entry.mood && (
                       <span className="text-2xl">{entry.mood}</span>
+                    )}
+                    {entry.is_draft && (
+                      <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full text-xs font-medium">
+                        Draft
+                      </span>
                     )}
                   </div>
                   <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
@@ -237,7 +291,7 @@ const DiaryEntries: React.FC = () => {
 
               {/* Entry Content */}
               <p className="text-gray-600 dark:text-gray-300 mb-4 line-clamp-3">
-                {entry.content}
+                {entry.content || 'No content yet...'}
               </p>
 
               {/* Audio Player */}
@@ -251,6 +305,7 @@ const DiaryEntries: React.FC = () => {
               {entry.commit_hash && (
                 <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                    <GitBranch size={14} />
                     <span className="font-mono bg-gray-200 dark:bg-gray-600 px-2 py-1 rounded text-xs">
                       {entry.commit_hash.substring(0, 7)}
                     </span>
@@ -265,7 +320,11 @@ const DiaryEntries: React.FC = () => {
                   {entry.tags.map(tag => (
                     <span
                       key={tag}
-                      className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-full text-sm"
+                      className={`px-2 py-1 rounded-full text-sm ${
+                        tag === 'auto-generated' 
+                          ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                      }`}
                     >
                       {tag}
                     </span>
@@ -289,15 +348,24 @@ const DiaryEntries: React.FC = () => {
           <p className="text-gray-500 dark:text-gray-400 mb-6">
             {selectedTags.length > 0 || searchQuery 
               ? 'Try adjusting your filters or search terms.' 
-              : 'Start writing your first diary entry!'}
+              : 'Start writing your first diary entry or sync your GitHub commits!'}
           </p>
           {selectedTags.length === 0 && !searchQuery && (
-            <button
-              onClick={handleNewEntry}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-            >
-              Create First Entry
-            </button>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={handleSyncCommits}
+                disabled={isSyncing}
+                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
+              >
+                {isSyncing ? 'Syncing...' : 'Sync GitHub Commits'}
+              </button>
+              <button
+                onClick={handleNewEntry}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                Create First Entry
+              </button>
+            </div>
           )}
         </div>
       )}
