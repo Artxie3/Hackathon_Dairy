@@ -23,31 +23,16 @@
   margin-bottom: 2rem;
 }
 
-.alert.alert-warning {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-  padding: 1rem;
-  border-radius: 0.5rem;
+.alert-warning {
   background-color: #fef3c7;
   color: #92400e;
   border: 1px solid #fcd34d;
 }
 
-.dark-theme .alert.alert-warning {
+.dark-theme .alert-warning {
   background-color: #451a03;
   color: #fbbf24;
   border-color: #92400e;
-}
-
-.alert h3 {
-  font-size: 1rem;
-  margin-bottom: 0.25rem;
-}
-
-.alert p {
-  font-size: 0.875rem;
-  line-height: 1.4;
 }
 
 /* Stats Grid */
@@ -354,47 +339,85 @@
   gap: 0.5rem;
 }
 
-/* Remove old action button styles */
-.action-btn,
-.action-tooltip {
-  display: none;
-}
-
-/* Update date info styles */
-.date-info {
+.action-btn {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
   color: var(--color-gray-600);
-  margin-bottom: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
 }
 
-.dark-theme .date-info {
+.dark-theme .action-btn {
   color: var(--color-gray-400);
 }
 
-.date-info .deadline {
-  font-weight: 500;
+.action-btn:hover {
+  background: var(--color-gray-100);
+}
+
+.dark-theme .action-btn:hover {
+  background: var(--color-gray-800);
+}
+
+.action-btn.edit-btn:hover {
+  color: var(--color-primary);
+  background: var(--color-primary-50);
+}
+
+.dark-theme .action-btn.edit-btn:hover {
+  color: var(--color-primary-light);
+  background: var(--color-primary-900);
+}
+
+.action-btn.delete-btn:hover {
   color: var(--color-red-600);
+  background: var(--color-red-50);
 }
 
-.dark-theme .date-info .deadline {
+.dark-theme .action-btn.delete-btn:hover {
   color: var(--color-red-400);
+  background: var(--color-red-900);
 }
 
-/* Add timezone notice styles */
-.timezone-notice {
-  display: inline-flex;
+.action-tooltip {
+  position: absolute;
+  bottom: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-gray-900);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.dark-theme .action-tooltip {
+  background: var(--color-gray-700);
+}
+
+.action-btn:hover .action-tooltip {
+  opacity: 1;
+  visibility: visible;
+  bottom: -28px;
+}
+
+.hackathon-meta {
+  display: flex;
   align-items: center;
-  gap: 0.25rem;
-  font-size: 0.75rem;
-  color: var(--color-gray-500);
-  margin-left: 0.5rem;
-}
-
-.dark-theme .timezone-notice {
-  color: var(--color-gray-400);
+  gap: 1rem;
+  margin-bottom: 1rem;
 }
 
 .status-badge {
@@ -438,6 +461,18 @@
   flex-direction: column;
   gap: 0.5rem;
   margin-bottom: 1rem;
+}
+
+.date-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--color-gray-600);
+}
+
+.dark-theme .date-info {
+  color: var(--color-gray-400);
 }
 
 .hackathon-links {
@@ -755,133 +790,8 @@
   }
 }
 
-/* Timezone Warning */
-.timezone-warning {
-  margin: 1.5rem 0;
-}
-
-.timezone-warning .text-xs {
-  font-size: 0.75rem;
-  line-height: 1rem;
-}
-
-.timezone-warning .font-medium {
-  font-weight: 500;
-}
-
-.timezone-warning .mt-1 {
-  margin-top: 0.25rem;
-}
-
-.timezone-warning .mt-2 {
-  margin-top: 0.5rem;
-}
-
-.timezone-warning .mb-1 {
-  margin-bottom: 0.25rem;
-}
-
-.timezone-warning .mb-2 {
-  margin-bottom: 0.5rem;
-}
-
 /* Remove prizes-related styles */
 .prizes-display,
 .prize-tag {
   display: none;
-}
-
-/* Confirmation Dialog */
-.confirmation-dialog {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.confirmation-dialog-content {
-  background: white;
-  border-radius: 12px;
-  padding: 2rem;
-  max-width: 400px;
-  width: 90%;
-  text-align: center;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.dark-theme .confirmation-dialog-content {
-  background: var(--color-gray-800);
-  color: var(--color-gray-100);
-}
-
-.confirmation-dialog h3 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  margin-bottom: 1rem;
-  color: var(--color-gray-900);
-}
-
-.dark-theme .confirmation-dialog h3 {
-  color: var(--color-gray-100);
-}
-
-.confirmation-dialog p {
-  color: var(--color-gray-600);
-  margin-bottom: 1.5rem;
-}
-
-.dark-theme .confirmation-dialog p {
-  color: var(--color-gray-400);
-}
-
-.confirmation-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-}
-
-.confirmation-btn {
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  border: none;
-  cursor: pointer;
-}
-
-.confirmation-btn.cancel {
-  background: var(--color-gray-100);
-  color: var(--color-gray-900);
-}
-
-.dark-theme .confirmation-btn.cancel {
-  background: var(--color-gray-700);
-  color: var(--color-gray-100);
-}
-
-.confirmation-btn.delete {
-  background: var(--color-red-500);
-  color: white;
-}
-
-.confirmation-btn:hover {
-  transform: translateY(-1px);
-}
-
-.confirmation-btn.cancel:hover {
-  background: var(--color-gray-200);
-}
-
-.dark-theme .confirmation-btn.cancel:hover {
-  background: var(--color-gray-600);
-}
-
-.confirmation-btn.delete:hover {
-  background: var(--color-red-600);
 } 

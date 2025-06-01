@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { GitBranch, RefreshCw, Save, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { GitBranch, RefreshCw, Save, AlertCircle, CheckCircle } from 'lucide-react';
 import { useDiary } from '../contexts/DiaryContext';
 import { useAuth } from '../contexts/AuthContext';
-import { useSettings } from '../contexts/SettingsContext';
 
 const Settings: React.FC = () => {
   const { syncGitHubCommits, isSyncing, lastSyncTime } = useDiary();
   const { user } = useAuth();
-  const { timezone, updateSettings } = useSettings();
-  const [localTimezone, setLocalTimezone] = useState(timezone);
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
   const [syncInterval, setSyncInterval] = useState(10); // minutes
   const [excludedRepos, setExcludedRepos] = useState<string[]>([]);
@@ -50,10 +47,6 @@ const Settings: React.FC = () => {
 
     try {
       localStorage.setItem('diary-settings', JSON.stringify(settings));
-      
-      // Update timezone settings
-      updateSettings({ timezone: localTimezone });
-      
       setSaveStatus('saved');
       
       // Apply theme immediately
@@ -100,74 +93,6 @@ const Settings: React.FC = () => {
       <h1 className="text-3xl font-bold mb-8 text-gray-900 dark:text-white">Settings</h1>
       
       <div className="space-y-8">
-        {/* Timezone Settings */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <Clock className="text-blue-600 dark:text-blue-400" size={24} />
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Timezone Settings</h2>
-          </div>
-          
-          <div className="space-y-4">
-            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" size={20} />
-                <div>
-                  <h3 className="font-medium text-yellow-800 dark:text-yellow-300 mb-1">Important Notice</h3>
-                  <p className="text-sm text-yellow-700 dark:text-yellow-400">
-                    Hackathon deadlines are displayed in GMT-5 timezone. Setting your local timezone helps you see equivalent times but doesn't change the actual deadlines.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Your Timezone
-              </label>
-              <select
-                value={localTimezone}
-                onChange={(e) => setLocalTimezone(e.target.value)}
-                className="form-select block w-full max-w-md px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="GMT-12">GMT-12 (Baker Island)</option>
-                <option value="GMT-11">GMT-11 (Samoa)</option>
-                <option value="GMT-10">GMT-10 (Hawaii)</option>
-                <option value="GMT-9">GMT-9 (Alaska)</option>
-                <option value="GMT-8">GMT-8 (Pacific Time)</option>
-                <option value="GMT-7">GMT-7 (Mountain Time)</option>
-                <option value="GMT-6">GMT-6 (Central Time)</option>
-                <option value="GMT-5">GMT-5 (Eastern Time / Hackathon Time)</option>
-                <option value="GMT-4">GMT-4 (Atlantic Time)</option>
-                <option value="GMT-3">GMT-3 (Brazil)</option>
-                <option value="GMT-2">GMT-2 (Mid-Atlantic)</option>
-                <option value="GMT-1">GMT-1 (Azores)</option>
-                <option value="GMT+0">GMT+0 (London, Dublin)</option>
-                <option value="GMT+1">GMT+1 (Central Europe)</option>
-                <option value="GMT+2">GMT+2 (Eastern Europe)</option>
-                <option value="GMT+3">GMT+3 (Moscow, Istanbul)</option>
-                <option value="GMT+4">GMT+4 (Dubai, Baku)</option>
-                <option value="GMT+5">GMT+5 (Pakistan, Uzbekistan)</option>
-                <option value="GMT+5:30">GMT+5:30 (India, Sri Lanka)</option>
-                <option value="GMT+6">GMT+6 (Bangladesh, Kazakhstan)</option>
-                <option value="GMT+7">GMT+7 (Thailand, Vietnam)</option>
-                <option value="GMT+8">GMT+8 (China, Singapore)</option>
-                <option value="GMT+9">GMT+9 (Japan, Korea)</option>
-                <option value="GMT+10">GMT+10 (Australia East)</option>
-                <option value="GMT+11">GMT+11 (Solomon Islands)</option>
-                <option value="GMT+12">GMT+12 (New Zealand)</option>
-              </select>
-              
-              {localTimezone !== 'GMT-5' && (
-                <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
-                  <p className="text-sm text-blue-700 dark:text-blue-300">
-                    <strong>Time difference:</strong> Your timezone is {getTimeDifference(localTimezone)} from hackathon time (GMT-5).
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
         {/* GitHub Integration */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
           <div className="flex items-center gap-3 mb-6">
@@ -354,21 +279,6 @@ const Settings: React.FC = () => {
       </div>
     </div>
   );
-};
-
-// Helper function to calculate time difference
-const getTimeDifference = (userTimezone: string): string => {
-  const hackathonOffset = -5; // GMT-5
-  const userOffset = parseInt(userTimezone.replace('GMT', '').replace('+', ''));
-  const difference = userOffset - hackathonOffset;
-  
-  if (difference > 0) {
-    return `${difference} hours ahead`;
-  } else if (difference < 0) {
-    return `${Math.abs(difference)} hours behind`;
-  } else {
-    return 'the same';
-  }
 };
 
 export default Settings; 

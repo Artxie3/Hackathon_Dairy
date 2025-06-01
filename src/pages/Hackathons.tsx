@@ -3,8 +3,6 @@ import { Plus, Calendar, Clock, Trophy, ExternalLink, Edit, Trash2, Users, Code,
 import { useHackathons, Hackathon } from '../contexts/HackathonContext';
 import { DevpostScraper } from '../utils/devpostScraper';
 import '../styles/Hackathons.css';
-import { format } from 'date-fns';
-import { useSettings } from '../contexts/SettingsContext';
 
 const Hackathons: React.FC = () => {
   const { 
@@ -19,8 +17,6 @@ const Hackathons: React.FC = () => {
     getCompletedHackathons
   } = useHackathons();
   
-  const { timezone = 'GMT-5' } = useSettings();
-  
   const [activeTab, setActiveTab] = useState<'all' | 'ongoing' | 'upcoming' | 'completed'>('all');
   const [isCreating, setIsCreating] = useState(false);
   const [editingHackathon, setEditingHackathon] = useState<Hackathon | null>(null);
@@ -29,6 +25,7 @@ const Hackathons: React.FC = () => {
   const [importError, setImportError] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<Hackathon>>({
     title: '',
+    organizer: '',
     description: '',
     startDate: '',
     endDate: '',
@@ -42,8 +39,6 @@ const Hackathons: React.FC = () => {
     technologies: [],
     notes: '',
   });
-  const [importedTimezone, setImportedTimezone] = useState<string | null>(null);
-  const [hackathonToDelete, setHackathonToDelete] = useState<Hackathon | null>(null);
 
   const upcomingDeadlines = getUpcomingDeadlines();
   const ongoingHackathons = getOngoingHackathons();
@@ -79,6 +74,7 @@ const Hackathons: React.FC = () => {
   const resetForm = () => {
     setFormData({
       title: '',
+      organizer: '',
       description: '',
       startDate: '',
       endDate: '',
@@ -103,64 +99,24 @@ const Hackathons: React.FC = () => {
   };
 
   const handleDelete = async (hackathon: Hackathon) => {
-    setHackathonToDelete(hackathon);
-  };
-
-  const confirmDelete = async () => {
-    if (hackathonToDelete) {
-      await deleteHackathon(hackathonToDelete.id);
-      setHackathonToDelete(null);
-    }
+    // Create and style a custom confirmation dialog
+    const confirmDelete = () => {
+      const result = window.confirm(
+        `Are you sure you want to delete "${hackathon.title}"?\n\nThis action cannot be undone.`
+      );
+      if (result) {
+        deleteHackathon(hackathon.id);
+      }
+    };
+    confirmDelete();
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return format(date, 'MMM d, yyyy h:mma');
-  };
-
-  const formatDateWithTimezone = (dateString: string) => {
-    const date = new Date(dateString);
-    const gmt5Time = format(date, 'MMM d, yyyy h:mma');
-    
-    // If user's timezone is different from GMT-5, show both times
-    if (timezone !== 'GMT-5') {
-      const userOffset = parseInt(timezone.replace('GMT', '').replace('+', ''));
-      const hackathonOffset = -5;
-      const hoursDifference = userOffset - hackathonOffset;
-      
-      const userTime = new Date(date.getTime() + (hoursDifference * 60 * 60 * 1000));
-      const userTimeFormatted = format(userTime, 'MMM d, yyyy h:mma');
-      
-      return (
-        <div className="flex flex-col">
-          <span className="font-medium">{gmt5Time} GMT-5</span>
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            ({userTimeFormatted} {timezone})
-          </span>
-        </div>
-      );
-    }
-    
-    return `${gmt5Time} GMT-5`;
-  };
-
-  // Add function to format regular dates with timezone info
-  const formatRegularDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const gmt5Time = format(date, 'MMM d, yyyy h:mma');
-    
-    if (timezone !== 'GMT-5') {
-      const userOffset = parseInt(timezone.replace('GMT', '').replace('+', ''));
-      const hackathonOffset = -5;
-      const hoursDifference = userOffset - hackathonOffset;
-      
-      const userTime = new Date(date.getTime() + (hoursDifference * 60 * 60 * 1000));
-      const userTimeFormatted = format(userTime, 'h:mma');
-      
-      return `${gmt5Time} GMT-5 (${userTimeFormatted} ${timezone})`;
-    }
-    
-    return `${gmt5Time} GMT-5`;
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
   };
 
   const getStatusColor = (status: string) => {
@@ -204,13 +160,11 @@ const Hackathons: React.FC = () => {
         return date.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
       };
 
-      // Store the detected timezone
-      setImportedTimezone(scrapedData.detectedTimezone);
-
       // Update form data with scraped information
       setFormData({
         ...formData,
         title: scrapedData.title,
+        organizer: scrapedData.organizer,
         description: scrapedData.description,
         startDate: formatDateForInput(scrapedData.startDate),
         endDate: formatDateForInput(scrapedData.endDate),
@@ -234,7 +188,6 @@ const Hackathons: React.FC = () => {
           ...formData,
           ...basicData,
         });
-        setImportedTimezone('Unknown');
         setImportError('Partial import successful - please verify and complete the details');
       } catch (fallbackError) {
         setImportError(error instanceof Error ? error.message : 'Failed to import hackathon data');
@@ -283,20 +236,6 @@ const Hackathons: React.FC = () => {
             <h3 className="font-semibold">Upcoming Deadlines</h3>
             <p className="text-sm">
               {upcomingDeadlines.length} hackathon{upcomingDeadlines.length > 1 ? 's' : ''} with deadlines in the next 7 days
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Add timezone warning if different from GMT-5 */}
-      {timezone !== 'GMT-5' && (
-        <div className="alert alert-warning mb-4">
-          <AlertCircle size={20} />
-          <div>
-            <h3 className="font-semibold">Timezone Notice</h3>
-            <p className="text-sm">
-              Hackathon deadlines are in GMT-5. Your current timezone is set to {timezone}.
-              Please adjust times accordingly to avoid missing deadlines.
             </p>
           </div>
         </div>
@@ -454,6 +393,14 @@ const Hackathons: React.FC = () => {
                     required
                   />
                 </div>
+                <div className="form-group">
+                  <label>Organizer</label>
+                  <input
+                    type="text"
+                    value={formData.organizer || ''}
+                    onChange={(e) => setFormData({...formData, organizer: e.target.value})}
+                  />
+                </div>
               </div>
 
               <div className="form-group">
@@ -465,31 +412,6 @@ const Hackathons: React.FC = () => {
                 />
               </div>
 
-              {/* Show timezone warning if dates were imported */}
-              {importedTimezone && (
-                <div className="timezone-warning">
-                  <div className="flex items-start gap-3 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                    <AlertCircle className="text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" size={20} />
-                    <div>
-                      <h3 className="font-medium text-yellow-800 dark:text-yellow-300 mb-1">
-                        Timezone Information
-                      </h3>
-                      <p className="text-sm text-yellow-700 dark:text-yellow-400 mb-2">
-                        <strong>Imported dates are in {importedTimezone} timezone.</strong>
-                      </p>
-                      <p className="text-sm text-yellow-700 dark:text-yellow-400">
-                        Please verify these times are correct for your location. The form shows times as they appear in your browser's local timezone.
-                      </p>
-                      {timezone !== importedTimezone && (
-                        <p className="text-sm text-red-600 dark:text-red-400 mt-2 font-medium">
-                          ⚠️ Your account timezone ({timezone}) differs from imported timezone ({importedTimezone})
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
               <div className="form-row">
                 <div className="form-group">
                   <label>Start Date *</label>
@@ -499,11 +421,6 @@ const Hackathons: React.FC = () => {
                     onChange={(e) => setFormData({...formData, startDate: e.target.value})}
                     required
                   />
-                  {importedTimezone && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Imported from {importedTimezone} timezone
-                    </p>
-                  )}
                 </div>
                 <div className="form-group">
                   <label>End Date *</label>
@@ -513,11 +430,6 @@ const Hackathons: React.FC = () => {
                     onChange={(e) => setFormData({...formData, endDate: e.target.value})}
                     required
                   />
-                  {importedTimezone && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Imported from {importedTimezone} timezone
-                    </p>
-                  )}
                 </div>
               </div>
 
@@ -530,11 +442,6 @@ const Hackathons: React.FC = () => {
                     onChange={(e) => setFormData({...formData, submissionDeadline: e.target.value})}
                     required
                   />
-                  {importedTimezone && (
-                    <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-medium">
-                      ⚠️ Critical: Imported from {importedTimezone} timezone - verify this is correct!
-                    </p>
-                  )}
                 </div>
                 <div className="form-group">
                   <label>Status</label>
@@ -580,21 +487,24 @@ const Hackathons: React.FC = () => {
             <div className="hackathon-header">
               <div>
                 <h3 className="hackathon-title">{hackathon.title}</h3>
+                <p className="hackathon-organizer">{hackathon.organizer}</p>
               </div>
-              <div className="flex gap-2 ml-4">
-                <button
-                  onClick={() => handleEdit(hackathon)}
-                  className="p-2 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors"
+              <div className="hackathon-actions">
+                <button 
+                  onClick={() => handleEdit(hackathon)} 
+                  className="action-btn edit-btn"
                   title="Edit hackathon"
                 >
                   <Edit size={16} />
+                  <span className="action-tooltip">Edit</span>
                 </button>
-                <button
-                  onClick={() => handleDelete(hackathon)}
-                  className="p-2 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors"
+                <button 
+                  onClick={() => handleDelete(hackathon)} 
+                  className="action-btn delete-btn"
                   title="Delete hackathon"
                 >
                   <Trash2 size={16} />
+                  <span className="action-tooltip">Delete</span>
                 </button>
               </div>
             </div>
@@ -614,24 +524,13 @@ const Hackathons: React.FC = () => {
             <p className="hackathon-description">{hackathon.description}</p>
 
             <div className="hackathon-dates">
-              <div className="date-info" title="Start and End Dates">
+              <div className="date-info">
                 <Calendar size={14} />
-                <span>
-                  {formatRegularDate(hackathon.startDate)} - {formatRegularDate(hackathon.endDate)}
-                </span>
+                <span>{formatDate(hackathon.startDate)} - {formatDate(hackathon.endDate)}</span>
               </div>
-              <div className="date-info" title="Submission Deadline">
+              <div className="date-info">
                 <Clock size={14} />
-                <div className="flex flex-col">
-                  <span className="font-medium text-red-600 dark:text-red-400">
-                    Deadline: {formatDateWithTimezone(hackathon.submissionDeadline)}
-                  </span>
-                  {timezone !== 'GMT-5' && (
-                    <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">
-                      ⚠️ Official time is GMT-5 - verify your local time!
-                    </span>
-                  )}
-                </div>
+                <span>Deadline: {formatDate(hackathon.submissionDeadline)}</span>
               </div>
             </div>
 
@@ -673,34 +572,6 @@ const Hackathons: React.FC = () => {
               Add Your First Hackathon
             </button>
           )}
-        </div>
-      )}
-
-      {/* Confirmation Dialog */}
-      {hackathonToDelete && (
-        <div className="confirmation-dialog">
-          <div className="confirmation-dialog-content">
-            <h3>Delete Hackathon</h3>
-            <p>
-              Are you sure you want to delete "{hackathonToDelete.title}"?
-              <br />
-              This action cannot be undone.
-            </p>
-            <div className="confirmation-actions">
-              <button
-                className="confirmation-btn cancel"
-                onClick={() => setHackathonToDelete(null)}
-              >
-                Cancel
-              </button>
-              <button
-                className="confirmation-btn delete"
-                onClick={confirmDelete}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </div>

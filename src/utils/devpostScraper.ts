@@ -1,5 +1,6 @@
 interface DevpostHackathonData {
   title: string;
+  organizer: string;
   description: string;
   startDate: string;
   endDate: string;
@@ -7,7 +8,6 @@ interface DevpostHackathonData {
   devpostUrl: string;
   participants?: number;
   status: 'upcoming' | 'ongoing' | 'completed';
-  detectedTimezone: string; // Add timezone info
 }
 
 export class DevpostScraper {
@@ -26,381 +26,86 @@ export class DevpostScraper {
         throw new Error('Please provide a valid Devpost URL');
       }
 
-      console.log('Starting scrape for:', devpostUrl);
-
-      // Clean up URL and get dates URL
-      const cleanUrl = devpostUrl.replace(/\/$/, '');
-      const datesUrl = `${cleanUrl}/details/dates`;
-
-      console.log('Main URL:', cleanUrl);
-      console.log('Dates URL:', datesUrl);
-
-      let mainHtmlContent = '';
-      let datesHtmlContent = '';
+      let htmlContent = '';
       let proxyError = null;
 
       // Try each CORS proxy in sequence until one works
       for (const proxy of this.CORS_PROXIES) {
         try {
-          console.log(`Trying proxy: ${proxy}`);
+          const proxyUrl = `${proxy}${encodeURIComponent(devpostUrl)}`;
+          const response = await fetch(proxyUrl);
           
-          // Fetch main page
-          const mainProxyUrl = `${proxy}${encodeURIComponent(cleanUrl)}`;
-          console.log('Main proxy URL:', mainProxyUrl);
-          const mainResponse = await fetch(mainProxyUrl);
-          
-          if (!mainResponse.ok) {
-            console.log(`Main page failed with status: ${mainResponse.status}`);
-            continue;
-          }
-
-          // Fetch dates page
-          const datesProxyUrl = `${proxy}${encodeURIComponent(datesUrl)}`;
-          console.log('Dates proxy URL:', datesProxyUrl);
-          const datesResponse = await fetch(datesProxyUrl);
-
-          if (!datesResponse.ok) {
-            console.log(`Dates page failed with status: ${datesResponse.status}`);
-            continue;
+          if (!response.ok) {
+            continue; // Try next proxy if this one fails
           }
 
           // Handle different proxy response formats
           if (proxy.includes('allorigins')) {
-            const mainData = await mainResponse.json();
-            const datesData = await datesResponse.json();
-            mainHtmlContent = mainData.contents;
-            datesHtmlContent = datesData.contents;
+            const data = await response.json();
+            htmlContent = data.contents;
           } else {
-            mainHtmlContent = await mainResponse.text();
-            datesHtmlContent = await datesResponse.text();
+            htmlContent = await response.text();
           }
 
-          console.log('Main content length:', mainHtmlContent.length);
-          console.log('Dates content length:', datesHtmlContent.length);
-
-          if (mainHtmlContent && datesHtmlContent) {
-            console.log('Successfully fetched both pages with proxy:', proxy);
-            break;
+          if (htmlContent) {
+            break; // Successfully got content, exit loop
           }
         } catch (err) {
-          console.log(`Proxy ${proxy} failed:`, err);
           proxyError = err;
-          continue;
+          continue; // Try next proxy
         }
       }
 
-      if (!mainHtmlContent || !datesHtmlContent) {
-        console.warn('All proxies failed, checking for known hackathons...');
-        
-        // Special handling for World's Largest Hackathon when proxies fail
-        if (devpostUrl.includes('worldslargesthackathon.devpost.com')) {
-          console.log('Using known data for World\'s Largest Hackathon');
-          return {
-            title: "World's Largest Hackathon presented by Bolt",
-            description: "Build with AI for a shot at some of the $1M+ in prizes",
-            startDate: "2025-05-30T07:15:00.000Z", // May 30 at 12:15 AM PDT = 7:15 AM UTC
-            endDate: "2025-06-30T21:00:00.000Z",   // June 30 at 2:00 PM PDT = 9:00 PM UTC
-            submissionDeadline: "2025-06-30T21:00:00.000Z",
-            devpostUrl,
-            status: 'ongoing' as const,
-            detectedTimezone: 'PDT'
-          };
-        }
-        
+      if (!htmlContent) {
+        // If all proxies failed, try fallback method
+        console.warn('All CORS proxies failed, using fallback method');
         return this.extractFromUrl(devpostUrl);
       }
 
-      // Parse both pages
+      // Create a DOM parser to extract information
       const parser = new DOMParser();
-      const mainDoc = parser.parseFromString(mainHtmlContent, 'text/html');
-      const datesDoc = parser.parseFromString(datesHtmlContent, 'text/html');
+      const doc = parser.parseFromString(htmlContent, 'text/html');
       
-      return this.extractHackathonData(mainDoc, datesDoc, devpostUrl);
+      return this.extractHackathonData(doc, devpostUrl);
     } catch (error) {
       console.error('Error scraping Devpost:', error);
-      
-      // Special handling for World's Largest Hackathon when everything fails
-      if (devpostUrl.includes('worldslargesthackathon.devpost.com')) {
-        console.log('Fallback: Using known data for World\'s Largest Hackathon');
-        return {
-          title: "World's Largest Hackathon presented by Bolt",
-          description: "Build with AI for a shot at some of the $1M+ in prizes",
-          startDate: "2025-05-30T07:15:00.000Z", // May 30 at 12:15 AM PDT = 7:15 AM UTC
-          endDate: "2025-06-30T21:00:00.000Z",   // June 30 at 2:00 PM PDT = 9:00 PM UTC
-          submissionDeadline: "2025-06-30T21:00:00.000Z",
-          devpostUrl,
-          status: 'ongoing' as const,
-          detectedTimezone: 'PDT'
-        };
-      }
-      
+      // Return basic data from URL if scraping fails
       return this.extractFromUrl(devpostUrl);
     }
   }
 
-  private static extractHackathonData(mainDoc: Document, datesDoc: Document, devpostUrl: string): DevpostHackathonData {
-    // Extract title and basic info from main page
-    const title = this.extractTitle(mainDoc);
-    const description = this.extractDescription(mainDoc);
-    const participants = this.extractParticipants(mainDoc);
-
-    // Extract dates from the dates page and detect timezone
-    const dateResult = this.extractDatesFromSchedule(datesDoc);
+  private static extractHackathonData(doc: Document, devpostUrl: string): DevpostHackathonData {
+    // Extract title
+    const title = this.extractTitle(doc);
     
-    // Determine status based on dates
-    const status = this.determineStatus(dateResult.submissionDeadline);
+    // Extract organizer
+    const organizer = this.extractOrganizer(doc);
+    
+    // Extract description
+    const description = this.extractDescription(doc);
+    
+    // Extract deadline
+    const deadline = this.extractDeadline(doc);
+    
+    // Extract dates (start/end)
+    const dates = this.extractDates(doc, deadline);
+    
+    // Extract participants count
+    const participants = this.extractParticipants(doc);
+    
+    // Determine status based on deadline
+    const status = this.determineStatus(deadline);
 
     return {
       title,
+      organizer,
       description,
-      startDate: dateResult.startDate,
-      endDate: dateResult.endDate,
-      submissionDeadline: dateResult.submissionDeadline,
+      startDate: dates.startDate,
+      endDate: dates.endDate,
+      submissionDeadline: deadline,
       devpostUrl,
       participants,
-      status,
-      detectedTimezone: dateResult.detectedTimezone
-    };
-  }
-
-  private static extractDatesFromSchedule(doc: Document): { 
-    startDate: string; 
-    endDate: string; 
-    submissionDeadline: string; 
-    detectedTimezone: string;
-  } {
-    try {
-      // Look for timezone indicator first
-      let detectedTimezone = 'GMT-5'; // Default
-
-      // Look for timezone in the page text
-      const pageText = doc.body?.textContent || '';
-      const timezoneMatch = pageText.match(/(GMT[+-]\d+)/gi);
-      if (timezoneMatch && timezoneMatch[0]) {
-        detectedTimezone = timezoneMatch[0].toUpperCase();
-      }
-
-      console.log('Detected timezone:', detectedTimezone);
-      console.log('Page content sample:', pageText.substring(0, 500));
-
-      // Method 1: Look for the schedule table
-      const scheduleRows = doc.querySelectorAll('table tr');
-      let submissionsRow = null;
-
-      for (const row of scheduleRows) {
-        const text = row.textContent?.toLowerCase() || '';
-        console.log('Table row text:', text);
-        if (text.includes('submission')) {
-          submissionsRow = row;
-          console.log('Found submissions row:', row.textContent);
-          break;
-        }
-      }
-
-      if (submissionsRow) {
-        const cells = submissionsRow.querySelectorAll('td');
-        console.log('Number of cells in submissions row:', cells.length);
-        
-        if (cells.length >= 2) {
-          const beginText = cells[0].textContent?.trim() || '';
-          const endText = cells[1].textContent?.trim() || '';
-
-          console.log('Raw begin text:', beginText);
-          console.log('Raw end text:', endText);
-
-          // Parse dates and keep them in the detected timezone
-          const startDate = this.parseDevpostDateKeepTimezone(beginText, detectedTimezone);
-          const endDate = this.parseDevpostDateKeepTimezone(endText, detectedTimezone);
-
-          console.log('Parsed start date:', startDate);
-          console.log('Parsed end date:', endDate);
-
-          if (startDate && endDate) {
-            return {
-              startDate: startDate.toISOString(),
-              endDate: endDate.toISOString(),
-              submissionDeadline: endDate.toISOString(),
-              detectedTimezone
-            };
-          }
-        }
-      }
-
-      // Method 2: Look for specific date patterns in the page text
-      console.log('Method 1 failed, trying Method 2...');
-      const dateMatches = pageText.match(/([A-Za-z]+\s+\d+\s+at\s+\d+:\d+(AM|PM)\s+GMT[+-]\d+)/gi);
-      console.log('Found date matches:', dateMatches);
-
-      if (dateMatches && dateMatches.length >= 2) {
-        const startDate = this.parseDevpostDateKeepTimezone(dateMatches[0], detectedTimezone);
-        const endDate = this.parseDevpostDateKeepTimezone(dateMatches[1], detectedTimezone);
-
-        console.log('Method 2 - Parsed start date:', startDate);
-        console.log('Method 2 - Parsed end date:', endDate);
-
-        if (startDate && endDate) {
-          return {
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString(),
-            submissionDeadline: endDate.toISOString(),
-            detectedTimezone
-          };
-        }
-      }
-
-      // Method 3: Look for period-specific patterns
-      console.log('Method 2 failed, trying Method 3...');
-      const submissionPeriodMatch = pageText.match(/submissions?\s*:?\s*([A-Za-z]+\s+\d+\s+at\s+\d+:\d+(AM|PM))[^A-Za-z]*to[^A-Za-z]*([A-Za-z]+\s+\d+\s+at\s+\d+:\d+(AM|PM))/i);
-      console.log('Submission period match:', submissionPeriodMatch);
-
-      if (submissionPeriodMatch) {
-        const startDateStr = submissionPeriodMatch[1];
-        const endDateStr = submissionPeriodMatch[3];
-        
-        console.log('Method 3 - Start date string:', startDateStr);
-        console.log('Method 3 - End date string:', endDateStr);
-
-        const startDate = this.parseDevpostDateKeepTimezone(startDateStr, detectedTimezone);
-        const endDate = this.parseDevpostDateKeepTimezone(endDateStr, detectedTimezone);
-
-        console.log('Method 3 - Parsed start date:', startDate);
-        console.log('Method 3 - Parsed end date:', endDate);
-
-        if (startDate && endDate) {
-          return {
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString(),
-            submissionDeadline: endDate.toISOString(),
-            detectedTimezone
-          };
-        }
-      }
-
-      // Fallback to default date handling
-      console.log('All methods failed, using default dates');
-      return this.getDefaultDates(detectedTimezone);
-    } catch (error) {
-      console.error('Error parsing schedule:', error);
-      return this.getDefaultDates('GMT-5');
-    }
-  }
-
-  private static parseDevpostDateKeepTimezone(dateStr: string, timezone: string): Date | null {
-    try {
-      console.log('Parsing date string:', dateStr, 'with timezone:', timezone);
-      
-      // Handle various formats with more flexible regex
-      // "May 30 at 2:15AM GMT-5", "June 30 at 4:00PM GMT-5", etc.
-      const patterns = [
-        /([A-Za-z]+)\s+(\d+)\s+at\s+(\d+):(\d+)(AM|PM)/i,  // Original pattern
-        /([A-Za-z]+)\s+(\d+),?\s+(\d+):(\d+)\s*(AM|PM)/i,  // Alternative pattern
-        /([A-Za-z]+)\s+(\d+)\s+(\d+):(\d+)\s*(AM|PM)/i,    // No "at"
-      ];
-
-      let match = null;
-      let patternUsed = -1;
-      
-      for (let i = 0; i < patterns.length; i++) {
-        match = dateStr.match(patterns[i]);
-        if (match) {
-          patternUsed = i;
-          break;
-        }
-      }
-
-      console.log('Pattern used:', patternUsed, 'Match result:', match);
-
-      if (match) {
-        const [fullMatch, month, day, hour, minute, ampm] = match;
-        
-        console.log('Extracted parts:', { fullMatch, month, day, hour, minute, ampm });
-        
-        // Convert to 24-hour format
-        let hours = parseInt(hour);
-        const originalHours = hours;
-        
-        if (ampm.toUpperCase() === 'PM' && hours < 12) {
-          hours += 12;
-        } else if (ampm.toUpperCase() === 'AM' && hours === 12) {
-          hours = 0;
-        }
-
-        console.log('Time conversion:', originalHours, ampm, '→', hours);
-
-        // Create date for 2025 exactly as it appears on Devpost
-        const monthIndex = new Date(`${month} 1, 2025`).getMonth();
-        console.log('Month conversion:', month, '→', monthIndex);
-        
-        // Create the date without any timezone conversion - keep it as displayed
-        const date = new Date(2025, monthIndex, parseInt(day), hours, parseInt(minute), 0, 0);
-        
-        console.log('Created date (exact from Devpost):', date);
-        console.log('Local ISO string:', date.toISOString());
-
-        return date;
-      } else {
-        console.log('No pattern matched for date string:', dateStr);
-        
-        // Try a more lenient approach - extract just numbers and AM/PM
-        const timeMatch = dateStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
-        const dayMatch = dateStr.match(/(\d+)/);
-        const monthMatch = dateStr.match(/([A-Za-z]+)/);
-        
-        console.log('Fallback parsing:', { timeMatch, dayMatch, monthMatch });
-        
-        if (timeMatch && dayMatch && monthMatch) {
-          const month = monthMatch[0];
-          const day = dayMatch[0];
-          const hour = timeMatch[1];
-          const minute = timeMatch[2];
-          const ampm = timeMatch[3];
-          
-          console.log('Fallback parts:', { month, day, hour, minute, ampm });
-          
-          // Parse with fallback data - no timezone conversion
-          let hours = parseInt(hour);
-          if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
-          if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
-          
-          const monthIndex = new Date(`${month} 1, 2025`).getMonth();
-          const date = new Date(2025, monthIndex, parseInt(day), hours, parseInt(minute), 0, 0);
-          
-          console.log('Fallback result (no conversion):', date);
-          return date;
-        }
-      }
-    } catch (error) {
-      console.error('Error parsing date:', dateStr, error);
-    }
-    return null;
-  }
-
-  private static getTimezoneOffsetHours(timezone: string): number {
-    // Convert timezone string to offset hours from UTC
-    const match = timezone.match(/GMT([+-])(\d+)/);
-    if (match) {
-      const sign = match[1] === '+' ? 1 : -1;
-      const hours = parseInt(match[2]);
-      return sign * hours;
-    }
-    return -5; // Default to GMT-5 (which is -5 hours from UTC)
-  }
-
-  private static getDefaultDates(timezone: string): { 
-    startDate: string; 
-    endDate: string; 
-    submissionDeadline: string; 
-    detectedTimezone: string;
-  } {
-    const now = new Date();
-    const end = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    const deadline = new Date(end.getTime() - 24 * 60 * 60 * 1000);
-
-    return {
-      startDate: now.toISOString(),
-      endDate: end.toISOString(),
-      submissionDeadline: deadline.toISOString(),
-      detectedTimezone: timezone
+      status
     };
   }
 
@@ -426,6 +131,39 @@ export class DevpostScraper {
     }
 
     return 'Untitled Hackathon';
+  }
+
+  private static extractOrganizer(doc: Document): string {
+    // Try to find organizer information
+    const organizerSelectors = [
+      '[data-testid="organizer"]',
+      '.organizer',
+      '.hackathon-organizer',
+      '.sponsor',
+      '.presented-by'
+    ];
+
+    for (const selector of organizerSelectors) {
+      const element = doc.querySelector(selector);
+      if (element?.textContent?.trim()) {
+        return element.textContent.trim();
+      }
+    }
+
+    // Try to extract from title (e.g., "Hackathon presented by Company")
+    const title = doc.querySelector('h1')?.textContent || '';
+    const presentedByMatch = title.match(/presented by (.+?)$/i);
+    if (presentedByMatch) {
+      return presentedByMatch[1].trim();
+    }
+
+    // Look for sponsor information
+    const sponsorElement = doc.querySelector('[class*="sponsor"], [class*="partner"]');
+    if (sponsorElement?.textContent?.trim()) {
+      return sponsorElement.textContent.trim();
+    }
+
+    return 'Unknown Organizer';
   }
 
   private static extractDescription(doc: Document): string {
@@ -464,6 +202,87 @@ export class DevpostScraper {
     return 'No description available';
   }
 
+  private static extractDeadline(doc: Document): string {
+    // Look for deadline information
+    const deadlineSelectors = [
+      '[data-testid="deadline"]',
+      '.deadline',
+      '.submission-deadline',
+      '[class*="deadline"]',
+      '[class*="due"]'
+    ];
+
+    for (const selector of deadlineSelectors) {
+      const element = doc.querySelector(selector);
+      if (element?.textContent?.trim()) {
+        const dateStr = element.textContent.trim();
+        const parsedDate = this.parseDate(dateStr);
+        if (parsedDate) {
+          return parsedDate;
+        }
+      }
+    }
+
+    // Look for date patterns in the entire document
+    const dateRegex = /(?:deadline|due|submit|closes?)\s*:?\s*([A-Za-z]+ \d{1,2},? \d{4}(?: @ \d{1,2}:\d{2}[ap]m)?)/gi;
+    const bodyText = doc.body?.textContent || '';
+    const dateMatch = bodyText.match(dateRegex);
+    
+    if (dateMatch && dateMatch[0]) {
+      const parsedDate = this.parseDate(dateMatch[0]);
+      if (parsedDate) {
+        return parsedDate;
+      }
+    }
+
+    // Default to 30 days from now if no deadline found
+    const defaultDeadline = new Date();
+    defaultDeadline.setDate(defaultDeadline.getDate() + 30);
+    return defaultDeadline.toISOString();
+  }
+
+  private static extractDates(doc: Document, deadline: string): { startDate: string; endDate: string } {
+    // Try to find start and end dates
+    const dateElements = doc.querySelectorAll('[class*="date"], [data-testid*="date"]');
+    
+    const dates: Date[] = [];
+    
+    dateElements.forEach(element => {
+      const dateStr = element.textContent?.trim();
+      if (dateStr) {
+        const parsed = this.parseDate(dateStr);
+        if (parsed) {
+          dates.push(new Date(parsed));
+        }
+      }
+    });
+
+    // Sort dates
+    dates.sort((a, b) => a.getTime() - b.getTime());
+    
+    const deadlineDate = new Date(deadline);
+    
+    // If we found dates, use them
+    if (dates.length >= 2) {
+      return {
+        startDate: dates[0].toISOString(),
+        endDate: dates[dates.length - 1].toISOString()
+      };
+    }
+    
+    // Otherwise, estimate based on deadline
+    const startDate = new Date(deadlineDate);
+    startDate.setDate(startDate.getDate() - 30); // Assume 30-day hackathon
+    
+    const endDate = new Date(deadlineDate);
+    endDate.setHours(endDate.getHours() - 1); // End 1 hour before deadline
+    
+    return {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString()
+    };
+  }
+
   private static extractParticipants(doc: Document): number | undefined {
     const bodyText = doc.body?.textContent || '';
     const participantMatch = bodyText.match(/(\d+)\s*participants?/i);
@@ -473,6 +292,36 @@ export class DevpostScraper {
     }
     
     return undefined;
+  }
+
+  private static parseDate(dateStr: string): string | null {
+    try {
+      // Clean up the date string
+      const cleaned = dateStr.replace(/^[^A-Za-z\d]*/, '').replace(/[^A-Za-z\d\s:@,-]*$/, '');
+      
+      // Try to parse various date formats
+      const date = new Date(cleaned);
+      
+      if (!isNaN(date.getTime())) {
+        return date.toISOString();
+      }
+      
+      // Try alternative parsing for "Jun 30, 2025 @ 4:00pm" format
+      const altMatch = cleaned.match(/([A-Za-z]+ \d{1,2},? \d{4})(?: @ (\d{1,2}:\d{2}[ap]m))?/);
+      if (altMatch) {
+        const dateStr = altMatch[1];
+        const timeStr = altMatch[2] || '11:59pm';
+        
+        const parsedDate = new Date(`${dateStr} ${timeStr}`);
+        if (!isNaN(parsedDate.getTime())) {
+          return parsedDate.toISOString();
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      return null;
+    }
   }
 
   private static determineStatus(deadline: string): 'upcoming' | 'ongoing' | 'completed' {
@@ -511,65 +360,18 @@ export class DevpostScraper {
     // Set default dates
     const now = new Date();
     const startDate = now.toISOString();
-    const endDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    const submissionDeadline = new Date(now.getTime() + 29 * 24 * 60 * 60 * 1000).toISOString();
+    const endDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days from now
+    const submissionDeadline = new Date(now.getTime() + 29 * 24 * 60 * 60 * 1000).toISOString(); // 29 days from now
 
     return {
       title,
+      organizer: 'Unknown Organizer',
       description: 'Imported from Devpost - Details unavailable. Please update manually.',
       startDate,
       endDate,
       submissionDeadline,
       devpostUrl,
-      status: 'upcoming',
-      detectedTimezone: 'Unknown'
+      status: 'upcoming'
     };
-  }
-
-  // Test method to verify date parsing
-  static testDateParsing() {
-    console.log('=== Testing Date Parsing ===');
-    
-    const testCases = [
-      'May 30 at 2:15AM GMT-5',
-      'June 30 at 4:00PM GMT-5',
-      'May 30 at 2:15AM',
-      'June 30 at 4:00PM',
-    ];
-
-    testCases.forEach((testCase, index) => {
-      console.log(`\nTest case ${index + 1}: "${testCase}"`);
-      const result = this.parseDevpostDateKeepTimezone(testCase, 'GMT-5');
-      console.log('Result:', result);
-      if (result) {
-        console.log('Formatted:', result.toLocaleString());
-      }
-    });
-  }
-
-  // Helper method to create dates from strings like "May 30 at 2:15AM" without timezone conversion
-  private static createDateFromString(dateStr: string, timezone: string): Date {
-    console.log('Creating date from string:', dateStr, 'timezone:', timezone);
-    
-    const regex = /([A-Za-z]+)\s+(\d+)\s+at\s+(\d+):(\d+)(AM|PM)/i;
-    const match = dateStr.match(regex);
-    
-    if (match) {
-      const [_, month, day, hour, minute, ampm] = match;
-      
-      let hours = parseInt(hour);
-      if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
-      if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
-      
-      const monthIndex = new Date(`${month} 1, 2025`).getMonth();
-      
-      // Create date exactly as it appears on Devpost - no timezone conversion
-      const date = new Date(2025, monthIndex, parseInt(day), hours, parseInt(minute), 0, 0);
-      
-      console.log('Created date (no conversion):', date);
-      return date;
-    }
-    
-    throw new Error(`Could not parse date string: ${dateStr}`);
   }
 } 
