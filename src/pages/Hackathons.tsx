@@ -30,7 +30,6 @@ const Hackathons: React.FC = () => {
   const [importError, setImportError] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<Hackathon>>({
     title: '',
-    organizer: '',
     description: '',
     startDate: '',
     endDate: '',
@@ -80,7 +79,6 @@ const Hackathons: React.FC = () => {
   const resetForm = () => {
     setFormData({
       title: '',
-      organizer: '',
       description: '',
       startDate: '',
       endDate: '',
@@ -185,7 +183,6 @@ const Hackathons: React.FC = () => {
       setFormData({
         ...formData,
         title: scrapedData.title,
-        organizer: scrapedData.organizer,
         description: scrapedData.description,
         startDate: formatDateForInput(scrapedData.startDate),
         endDate: formatDateForInput(scrapedData.endDate),
@@ -262,15 +259,19 @@ const Hackathons: React.FC = () => {
         </div>
       )}
 
-      {/* Add timezone warning if different from GMT-5 */}
+      {/* Enhanced timezone warning */}
       {timezone !== 'GMT-5' && (
         <div className="alert alert-warning mb-4">
           <AlertCircle size={20} />
           <div>
-            <h3 className="font-semibold">Timezone Notice</h3>
+            <h3 className="font-semibold">⚠️ Timezone Notice</h3>
             <p className="text-sm">
-              Hackathon deadlines are in GMT-5. Your current timezone is set to {timezone}.
-              Please adjust times accordingly to avoid missing deadlines.
+              Hackathon deadlines are in <strong>GMT-5 (Eastern Time)</strong>. 
+              Your timezone is set to <strong>{timezone}</strong>.
+              <br />
+              <span className="text-red-600 dark:text-red-400 font-medium">
+                Make sure to check deadline times carefully to avoid missing submissions!
+              </span>
             </p>
           </div>
         </div>
@@ -418,24 +419,14 @@ const Hackathons: React.FC = () => {
             )}
 
             <form onSubmit={handleSubmit} className="hackathon-form">
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Title *</label>
-                  <input
-                    type="text"
-                    value={formData.title || ''}
-                    onChange={(e) => setFormData({...formData, title: e.target.value})}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Organizer</label>
-                  <input
-                    type="text"
-                    value={formData.organizer || ''}
-                    onChange={(e) => setFormData({...formData, organizer: e.target.value})}
-                  />
-                </div>
+              <div className="form-group">
+                <label>Title *</label>
+                <input
+                  type="text"
+                  value={formData.title || ''}
+                  onChange={(e) => setFormData({...formData, title: e.target.value})}
+                  required
+                />
               </div>
 
               <div className="form-group">
@@ -445,6 +436,26 @@ const Hackathons: React.FC = () => {
                   onChange={(e) => setFormData({...formData, description: e.target.value})}
                   rows={3}
                 />
+              </div>
+
+              {/* Timezone warning in form */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
+                <div className="flex items-start gap-2">
+                  <Clock className="text-blue-600 dark:text-blue-400 mt-0.5" size={16} />
+                  <div className="text-sm">
+                    <p className="font-medium text-blue-800 dark:text-blue-200">
+                      Timezone Information
+                    </p>
+                    <p className="text-blue-700 dark:text-blue-300">
+                      Hackathon times are typically in GMT-5. Your current timezone: <strong>{timezone}</strong>
+                      {timezone !== 'GMT-5' && (
+                        <span className="block mt-1 text-amber-600 dark:text-amber-400">
+                          ⚠️ Times will be converted and displayed in both timezones for clarity.
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div className="form-row">
@@ -522,7 +533,6 @@ const Hackathons: React.FC = () => {
             <div className="hackathon-header">
               <div>
                 <h3 className="hackathon-title">{hackathon.title}</h3>
-                <p className="hackathon-organizer">{hackathon.organizer}</p>
               </div>
               <div className="flex gap-2 ml-4">
                 <button
@@ -557,16 +567,16 @@ const Hackathons: React.FC = () => {
             <p className="hackathon-description">{hackathon.description}</p>
 
             <div className="hackathon-dates">
-              <div className="date-info" title="Start and End Dates">
+              <div className="date-info" title="Hackathon Duration">
                 <Calendar size={14} />
                 <span>
                   {formatDate(hackathon.startDate)} - {formatDate(hackathon.endDate)}
                 </span>
               </div>
-              <div className="date-info" title="Submission Deadline">
+              <div className="date-info deadline-critical" title="Submission Deadline - Critical!">
                 <Clock size={14} />
                 <span className="font-medium text-red-600 dark:text-red-400">
-                  Deadline: {formatDateWithTimezone(hackathon.submissionDeadline)}
+                  🚨 Deadline: {formatDateWithTimezone(hackathon.submissionDeadline)}
                 </span>
               </div>
             </div>

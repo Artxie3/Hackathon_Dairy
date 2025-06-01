@@ -1,6 +1,5 @@
 interface DevpostHackathonData {
   title: string;
-  organizer: string;
   description: string;
   startDate: string;
   endDate: string;
@@ -93,11 +92,10 @@ export class DevpostScraper {
   private static extractHackathonData(mainDoc: Document, datesDoc: Document, devpostUrl: string): DevpostHackathonData {
     // Extract title and basic info from main page
     const title = this.extractTitle(mainDoc);
-    const organizer = this.extractOrganizer(mainDoc);
     const description = this.extractDescription(mainDoc);
     const participants = this.extractParticipants(mainDoc);
 
-    // Extract dates from the dates page
+    // Extract dates from the dates page with proper timezone handling
     const dates = this.extractDatesFromSchedule(datesDoc);
     
     // Determine status based on dates
@@ -105,7 +103,6 @@ export class DevpostScraper {
 
     return {
       title,
-      organizer,
       description,
       startDate: dates.startDate,
       endDate: dates.endDate,
@@ -160,12 +157,12 @@ export class DevpostScraper {
 
   private static parseDevpostDate(dateStr: string): Date | null {
     try {
-      // First, clean up the date string
+      // Clean up the date string
       const cleanDateStr = dateStr.trim()
-        .replace(/\s+/g, ' ') // Normalize spaces
-        .replace(/\.$/, ''); // Remove trailing period
+        .replace(/\s+/g, ' ')
+        .replace(/\.$/, '');
 
-      // Match pattern like "May 30 at 2:15AM GMT-5"
+      // Handle GMT-5 format: "May 30 at 2:15AM GMT-5"
       const regex = /([A-Za-z]+)\s+(\d+)\s+at\s+(\d+):(\d+)\s*(AM|PM)\s*GMT-5/i;
       const match = cleanDateStr.match(regex);
 
@@ -173,7 +170,7 @@ export class DevpostScraper {
         const [_, month, day, hourStr, minuteStr, ampm] = match;
         
         // Parse components
-        const monthIndex = new Date(`${month} 1`).getMonth();
+        const monthIndex = new Date(`${month} 1, 2025`).getMonth();
         const dayNum = parseInt(day, 10);
         let hour = parseInt(hourStr, 10);
         const minute = parseInt(minuteStr, 10);
@@ -185,15 +182,16 @@ export class DevpostScraper {
           hour = 0;
         }
 
-        // Create date in UTC
-        const date = new Date(Date.UTC(2025, monthIndex, dayNum));
+        // Create date in GMT-5 (Eastern Time)
+        // GMT-5 is 5 hours behind UTC
+        const date = new Date();
+        date.setFullYear(2025, monthIndex, dayNum);
+        date.setHours(hour, minute, 0, 0);
         
-        // Set time (GMT-5 is UTC-5)
-        // So if it's 2:15 AM GMT-5, it's 7:15 AM UTC
-        const utcHour = (hour + 5) % 24; // Add 5 hours for UTC
-        date.setUTCHours(utcHour, minute, 0, 0);
-
-        return date;
+        // Convert to UTC by adding 5 hours
+        const utcDate = new Date(date.getTime() + (5 * 60 * 60 * 1000));
+        
+        return utcDate;
       }
 
       console.warn('Failed to parse date:', cleanDateStr);
@@ -238,137 +236,6 @@ export class DevpostScraper {
     }
 
     return 'Untitled Hackathon';
-  }
-
-  private static extractOrganizer(doc: Document): string {
-    // Try to find organizer information from various selectors
-    const organizerSelectors = [
-      // Look for sponsor/organizer badges or tags
-      '[data-testid="organizer"]',
-      '.organizer',
-      '.hackathon-organizer',
-      '.sponsor-name',
-      '.sponsor',
-      '.presented-by',
-      // Look for company/organization links or badges
-      'a[href*="stackblitz"]',
-      'a[href*="bolt"]',
-      // Look for badges or chips that might contain organizer info
-      '.badge',
-      '.chip',
-      '.tag',
-      // Look for sponsor sections
-      '[class*="sponsor"]',
-      '[class*="partner"]',
-      '[class*="organizer"]'
-    ];
-
-    for (const selector of organizerSelectors) {
-      const elements = doc.querySelectorAll(selector);
-      for (const element of elements) {
-        const text = element.textContent?.trim();
-        if (text && text.length > 2 && text.length < 100) {
-          // Skip common non-organizer text
-          if (!text.match(/^(managed|by|devpost|hackathon|join|create|edit|project|view|participants?)$/i)) {
-            return text;
-          }
-        }
-      }
-    }
-
-    // Try to extract from title (e.g., "Hackathon presented by Company")
-    const titleElement = doc.querySelector('h1');
-    if (titleElement?.textContent) {
-      const title = titleElement.textContent.trim();
-      
-      // Look for "presented by" pattern
-      const presentedByMatch = title.match(/presented by (.+?)(?:\s*$|\s*:|\s*-)/i);
-      if (presentedByMatch) {
-        return presentedByMatch[1].trim();
-      }
-      
-      // Look for "by" pattern
-      const byMatch = title.match(/\s+by\s+(.+?)(?:\s*$|\s*:|\s*-)/i);
-      if (byMatch) {
-        return byMatch[1].trim();
-      }
-    }
-
-    // Look for text patterns that might indicate organizer
-    const bodyText = doc.body?.textContent || '';
-    
-    // Look for "Managed by" pattern
-    const managedByMatch = bodyText.match(/Managed by\s+([^.\n]+)/i);
-    if (managedByMatch) {
-      const organizer = managedByMatch[1].trim();
-      if (organizer && organizer.length < 50) {
-        return organizer;
-      }
-    }
-
-    // Look for company names in common patterns
-    const companyPatterns = [
-      /(?:Sponsored by|Organized by|Hosted by)\s+([^.\n,]+)/i,
-      /([A-Z][a-zA-Z\s&\/]{2,30})\s+(?:presents|hosts|organizes)/i
-    ];
-
-    for (const pattern of companyPatterns) {
-      const match = bodyText.match(pattern);
-      if (match && match[1]) {
-        const organizer = match[1].trim();
-        if (organizer.length > 2 && organizer.length < 50) {
-          return organizer;
-        }
-      }
-    }
-
-    // Look for meta tags that might contain organizer info
-    const metaOrganizer = doc.querySelector('meta[name="organizer"], meta[property="organizer"]');
-    if (metaOrganizer) {
-      const content = metaOrganizer.getAttribute('content');
-      if (content?.trim()) {
-        return content.trim();
-      }
-    }
-
-    // Look for structured data (JSON-LD)
-    const jsonLdScripts = doc.querySelectorAll('script[type="application/ld+json"]');
-    for (const script of jsonLdScripts) {
-      try {
-        const data = JSON.parse(script.textContent || '');
-        if (data.organizer?.name) {
-          return data.organizer.name;
-        }
-        if (data.sponsor?.name) {
-          return data.sponsor.name;
-        }
-      } catch (e) {
-        // Continue if JSON parsing fails
-      }
-    }
-
-    // Last resort: look for any text that looks like a company name
-    const allText = doc.body?.textContent || '';
-    const companyLikePatterns = [
-      /([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*(?:\s*\/\s*[A-Z][a-zA-Z]+)*)/g
-    ];
-
-    for (const pattern of companyLikePatterns) {
-      const matches = Array.from(allText.matchAll(pattern));
-      for (const match of matches) {
-        const candidate = match[1].trim();
-        // Filter out common non-organizer words
-        if (candidate.length > 3 && candidate.length < 40 && 
-            !candidate.match(/^(Devpost|Hackathon|Project|Join|Create|Edit|View|Public|Online|Participants?|Winners?|Prizes?|Rules?|Updates?|Discussions?|Resources?|Gallery)$/i)) {
-          // If it contains "Bolt" or "StackBlitz" or similar tech company patterns, it's likely the organizer
-          if (candidate.match(/(?:Bolt|StackBlitz|Tech|Labs|Inc|Corp|LLC|Ltd|Co\.|Company)/i)) {
-            return candidate;
-          }
-        }
-      }
-    }
-
-    return 'Unknown Organizer';
   }
 
   private static extractDescription(doc: Document): string {
@@ -454,12 +321,11 @@ export class DevpostScraper {
     // Set default dates
     const now = new Date();
     const startDate = now.toISOString();
-    const endDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days from now
-    const submissionDeadline = new Date(now.getTime() + 29 * 24 * 60 * 60 * 1000).toISOString(); // 29 days from now
+    const endDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const submissionDeadline = new Date(now.getTime() + 29 * 24 * 60 * 60 * 1000).toISOString();
 
     return {
       title,
-      organizer: 'Unknown Organizer',
       description: 'Imported from Devpost - Details unavailable. Please update manually.',
       startDate,
       endDate,
