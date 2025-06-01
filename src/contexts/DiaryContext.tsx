@@ -2,8 +2,20 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { DiaryEntry, diaryEntries } from '../utils/supabase';
 
+interface TemporaryDraft {
+  id: string;
+  title: string;
+  content: string;
+  commit_hash: string;
+  commit_repo: string;
+  created_at: string;
+  tags: string[];
+  isTemporary: true;
+}
+
 interface DiaryContextType {
   entries: DiaryEntry[];
+  temporaryDrafts: TemporaryDraft[];
   loading: boolean;
   error: string | null;
   createEntry: (entry: Partial<DiaryEntry>) => Promise<DiaryEntry>;
@@ -13,6 +25,8 @@ interface DiaryContextType {
   syncGitHubCommits: () => Promise<void>;
   isSyncing: boolean;
   lastSyncTime: Date | null;
+  convertTemporaryDraft: (draftId: string) => Promise<DiaryEntry>;
+  dismissTemporaryDraft: (draftId: string) => void;
 }
 
 const DiaryContext = createContext<DiaryContextType | undefined>(undefined);
@@ -20,6 +34,7 @@ const DiaryContext = createContext<DiaryContextType | undefined>(undefined);
 export function DiaryProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
+  const [temporaryDrafts, setTemporaryDrafts] = useState<TemporaryDraft[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -112,22 +127,77 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
     setEntries(prev => prev.filter(entry => entry.id !== id));
   };
 
+  const convertTemporaryDraft = async (draftId: string): Promise<DiaryEntry> => {
+    const draft = temporaryDrafts.find(d => d.id === draftId);
+    if (!draft) throw new Error('Draft not found');
+
+    // Create the actual entry in the database
+    const newEntry = await createEntry({
+      title: draft.title || 'Untitled Entry',
+      content: draft.content,
+      commit_hash: draft.commit_hash,
+      commit_repo: draft.commit_repo,
+      is_draft: true,
+      tags: draft.tags,
+      created_at: draft.created_at,
+    });
+
+    // Remove from temporary drafts
+    setTemporaryDrafts(prev => prev.filter(d => d.id !== draftId));
+
+    return newEntry;
+  };
+
+  const dismissTemporaryDraft = (draftId: string) => {
+    setTemporaryDrafts(prev => prev.filter(d => d.id !== draftId));
+  };
+
   const handleCommitEvent = async (commitHash: string, repo: string, message: string) => {
     if (!user?.username) return;
 
     try {
-      // Check for existing entry for this commit
+      // Check for existing entry for this commit (both saved and temporary)
       const existingEntry = entries.find(entry => entry.commit_hash === commitHash);
+      const existingDraft = temporaryDrafts.find(draft => draft.commit_hash === commitHash);
       
-      if (!existingEntry) {
-        await createEntry({
-          title: message.split('\n')[0] || 'New Commit',
-          content: message.split('\n').slice(1).join('\n').trim() || '',
+      if (!existingEntry && !existingDraft) {
+        // Create temporary draft instead of saving immediately
+        const lines = message.split('\n');
+        const title = lines[0] || '';
+        const content = lines.slice(1).filter((line: string) => line.trim()).join('\n').trim();
+
+        const tags = ['commit', 'auto-generated'];
+        const messageText = message.toLowerCase();
+        
+        if (messageText.includes('fix') || messageText.includes('bug')) {
+          tags.push('bug-fix');
+        }
+        if (messageText.includes('feat') || messageText.includes('feature')) {
+          tags.push('feature');
+        }
+        if (messageText.includes('refactor')) {
+          tags.push('refactor');
+        }
+        if (messageText.includes('test')) {
+          tags.push('testing');
+        }
+        if (messageText.includes('doc')) {
+          tags.push('documentation');
+        }
+
+        const temporaryDraft: TemporaryDraft = {
+          id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          title,
+          content,
           commit_hash: commitHash,
           commit_repo: repo,
-          is_draft: true,
-          tags: ['commit', 'auto-generated'],
-        });
+          created_at: new Date().toISOString(),
+          tags,
+          isTemporary: true,
+        };
+
+        setTemporaryDrafts(prev => [temporaryDraft, ...prev]);
+        console.log('Created temporary draft for commit:', commitHash);
       }
     } catch (err) {
       console.error('Error handling commit event:', err);
@@ -180,7 +250,7 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
       const pushEvents = events.filter((event: any) => event.type === 'PushEvent');
       console.log('Found push events:', pushEvents.length);
 
-      let newEntriesCount = 0;
+      let newDraftsCount = 0;
 
       for (const event of pushEvents) {
         const { payload, repo, created_at } = event;
@@ -195,17 +265,20 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
         const commits = payload.commits || [];
 
         for (const commit of commits) {
-          // Check if we already have an entry for this commit
+          // Check if we already have an entry or draft for this commit
           const existingEntry = entries.find(entry => 
             entry.commit_hash === commit.sha
           );
+          const existingDraft = temporaryDrafts.find(draft => 
+            draft.commit_hash === commit.sha
+          );
 
-          if (!existingEntry) {
-            console.log('Creating entry for commit:', commit.sha);
+          if (!existingEntry && !existingDraft) {
+            console.log('Creating temporary draft for commit:', commit.sha);
             
             // Extract meaningful content from commit message
             const lines = commit.message.split('\n');
-            const title = lines[0] || 'Commit';
+            const title = lines[0] || '';
             const content = lines.slice(1).filter((line: string) => line.trim()).join('\n').trim();
 
             // Determine tags based on commit message
@@ -228,28 +301,27 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
               tags.push('documentation');
             }
 
-            try {
-              await createEntry({
-                title,
-                content: content || `Committed changes to ${repoName}`,
-                commit_hash: commit.sha,
-                commit_repo: repoName,
-                is_draft: true,
-                tags,
-                created_at: created_at,
-              });
-              newEntriesCount++;
-            } catch (createError) {
-              console.error('Error creating entry for commit:', commit.sha, createError);
-            }
+            const temporaryDraft: TemporaryDraft = {
+              id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              title,
+              content,
+              commit_hash: commit.sha,
+              commit_repo: repoName,
+              created_at: created_at,
+              tags,
+              isTemporary: true,
+            };
+
+            setTemporaryDrafts(prev => [temporaryDraft, ...prev]);
+            newDraftsCount++;
           }
         }
       }
 
       setLastSyncTime(new Date());
-      console.log(`Sync completed. Created ${newEntriesCount} new entries.`);
+      console.log(`Sync completed. Created ${newDraftsCount} new temporary drafts.`);
       
-      if (newEntriesCount > 0) {
+      if (newDraftsCount > 0) {
         setError(null);
       }
 
@@ -264,6 +336,7 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
   return (
     <DiaryContext.Provider value={{
       entries,
+      temporaryDrafts,
       loading,
       error,
       createEntry,
@@ -273,6 +346,8 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
       syncGitHubCommits,
       isSyncing,
       lastSyncTime,
+      convertTemporaryDraft,
+      dismissTemporaryDraft,
     }}>
       {children}
     </DiaryContext.Provider>
