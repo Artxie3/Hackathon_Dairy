@@ -3,6 +3,8 @@ import { Plus, Calendar, Clock, Trophy, ExternalLink, Edit, Trash2, Users, Code,
 import { useHackathons, Hackathon } from '../contexts/HackathonContext';
 import { DevpostScraper } from '../utils/devpostScraper';
 import '../styles/Hackathons.css';
+import { format } from 'date-fns';
+import { useSettings } from '../contexts/SettingsContext';
 
 const Hackathons: React.FC = () => {
   const { 
@@ -16,6 +18,8 @@ const Hackathons: React.FC = () => {
     getOngoingHackathons,
     getCompletedHackathons
   } = useHackathons();
+  
+  const { timezone = 'GMT-5' } = useSettings();
   
   const [activeTab, setActiveTab] = useState<'all' | 'ongoing' | 'upcoming' | 'completed'>('all');
   const [isCreating, setIsCreating] = useState(false);
@@ -111,11 +115,13 @@ const Hackathons: React.FC = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
+    const date = new Date(dateString);
+    return format(date, 'MMM d, yyyy h:mma');
+  };
+
+  const formatDateWithTimezone = (dateString: string) => {
+    const date = new Date(dateString);
+    return `${format(date, 'MMM d, yyyy h:mma')} ${timezone}`;
   };
 
   const getStatusColor = (status: string) => {
@@ -235,6 +241,20 @@ const Hackathons: React.FC = () => {
             <h3 className="font-semibold">Upcoming Deadlines</h3>
             <p className="text-sm">
               {upcomingDeadlines.length} hackathon{upcomingDeadlines.length > 1 ? 's' : ''} with deadlines in the next 7 days
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Add timezone warning if different from GMT-5 */}
+      {timezone !== 'GMT-5' && (
+        <div className="alert alert-warning mb-4">
+          <AlertCircle size={20} />
+          <div>
+            <h3 className="font-semibold">Timezone Notice</h3>
+            <p className="text-sm">
+              Hackathon deadlines are in GMT-5. Your current timezone is set to {timezone}.
+              Please adjust times accordingly to avoid missing deadlines.
             </p>
           </div>
         </div>
@@ -488,22 +508,20 @@ const Hackathons: React.FC = () => {
                 <h3 className="hackathon-title">{hackathon.title}</h3>
                 <p className="hackathon-organizer">{hackathon.organizer}</p>
               </div>
-              <div className="hackathon-actions">
-                <button 
-                  onClick={() => handleEdit(hackathon)} 
-                  className="action-btn edit-btn"
+              <div className="flex gap-2 ml-4">
+                <button
+                  onClick={() => handleEdit(hackathon)}
+                  className="p-2 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors"
                   title="Edit hackathon"
                 >
                   <Edit size={16} />
-                  <span className="action-tooltip">Edit</span>
                 </button>
-                <button 
-                  onClick={() => handleDelete(hackathon)} 
-                  className="action-btn delete-btn"
+                <button
+                  onClick={() => handleDelete(hackathon)}
+                  className="p-2 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors"
                   title="Delete hackathon"
                 >
                   <Trash2 size={16} />
-                  <span className="action-tooltip">Delete</span>
                 </button>
               </div>
             </div>
@@ -523,13 +541,17 @@ const Hackathons: React.FC = () => {
             <p className="hackathon-description">{hackathon.description}</p>
 
             <div className="hackathon-dates">
-              <div className="date-info">
+              <div className="date-info" title="Start and End Dates">
                 <Calendar size={14} />
-                <span>{formatDate(hackathon.startDate)} - {formatDate(hackathon.endDate)}</span>
+                <span>
+                  {formatDate(hackathon.startDate)} - {formatDate(hackathon.endDate)}
+                </span>
               </div>
-              <div className="date-info">
+              <div className="date-info" title="Submission Deadline">
                 <Clock size={14} />
-                <span>Deadline: {formatDate(hackathon.submissionDeadline)}</span>
+                <span className="font-medium text-red-600 dark:text-red-400">
+                  Deadline: {formatDateWithTimezone(hackathon.submissionDeadline)}
+                </span>
               </div>
             </div>
 

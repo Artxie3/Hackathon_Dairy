@@ -23,16 +23,31 @@
   margin-bottom: 2rem;
 }
 
-.alert-warning {
+.alert.alert-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 0.5rem;
   background-color: #fef3c7;
   color: #92400e;
   border: 1px solid #fcd34d;
 }
 
-.dark-theme .alert-warning {
+.dark-theme .alert.alert-warning {
   background-color: #451a03;
   color: #fbbf24;
   border-color: #92400e;
+}
+
+.alert h3 {
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.alert p {
+  font-size: 0.875rem;
+  line-height: 1.4;
 }
 
 /* Stats Grid */
@@ -339,82 +354,47 @@
   gap: 0.5rem;
 }
 
-.action-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--color-gray-600);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-  margin-left: 0.5rem;
+/* Remove old action button styles */
+.action-btn,
+.action-tooltip {
+  display: none;
 }
 
-.dark-theme .action-btn {
+/* Update date info styles */
+.date-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--color-gray-600);
+  margin-bottom: 0.5rem;
+}
+
+.dark-theme .date-info {
   color: var(--color-gray-400);
 }
 
-.action-btn:hover {
-  transform: translateY(-1px);
+.date-info .deadline {
+  font-weight: 500;
+  color: var(--color-red-600);
 }
 
-.action-btn.edit-btn:hover {
-  color: var(--color-blue-500);
-  background: var(--color-blue-50);
-}
-
-.dark-theme .action-btn.edit-btn:hover {
-  color: var(--color-blue-400);
-  background: var(--color-blue-900);
-}
-
-.action-btn.delete-btn:hover {
-  color: var(--color-red-500);
-  background: var(--color-red-50);
-}
-
-.dark-theme .action-btn.delete-btn:hover {
+.dark-theme .date-info .deadline {
   color: var(--color-red-400);
-  background: var(--color-red-900);
 }
 
-.action-tooltip {
-  position: absolute;
-  bottom: -24px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--color-gray-900);
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  white-space: nowrap;
-  opacity: 0;
-  visibility: hidden;
-  transition: all 0.2s ease;
-  z-index: 10;
-}
-
-.dark-theme .action-tooltip {
-  background: var(--color-gray-700);
-}
-
-.action-btn:hover .action-tooltip {
-  opacity: 1;
-  visibility: visible;
-  bottom: -28px;
-}
-
-.hackathon-meta {
-  display: flex;
+/* Add timezone notice styles */
+.timezone-notice {
+  display: inline-flex;
   align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--color-gray-500);
+  margin-left: 0.5rem;
+}
+
+.dark-theme .timezone-notice {
+  color: var(--color-gray-400);
 }
 
 .status-badge {
@@ -458,18 +438,6 @@
   flex-direction: column;
   gap: 0.5rem;
   margin-bottom: 1rem;
-}
-
-.date-info {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.75rem;
-  color: var(--color-gray-600);
-}
-
-.dark-theme .date-info {
-  color: var(--color-gray-400);
 }
 
 .hackathon-links {

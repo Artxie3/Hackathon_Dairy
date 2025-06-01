@@ -138,16 +138,15 @@ export class DevpostScraper {
           const beginText = cells[0].textContent?.trim() || '';
           const endText = cells[1].textContent?.trim() || '';
 
-          // Parse dates considering PDT/EDT timezone
+          // Parse dates with GMT-5 timezone
           const startDate = this.parseDevpostDate(beginText);
           const endDate = this.parseDevpostDate(endText);
-          const submissionDeadline = endDate;
 
           if (startDate && endDate) {
             return {
               startDate: startDate.toISOString(),
               endDate: endDate.toISOString(),
-              submissionDeadline: submissionDeadline.toISOString()
+              submissionDeadline: endDate.toISOString()
             };
           }
         }
@@ -163,31 +162,26 @@ export class DevpostScraper {
 
   private static parseDevpostDate(dateStr: string): Date | null {
     try {
-      // Handle various Devpost date formats
-      // Example: "May 30 at 12:15am PDT" or "June 30 at 2:00pm PDT"
-      const regex = /([A-Za-z]+)\s+(\d+)(?:\s+at\s+(\d+):(\d+)(am|pm))?\s*(PDT|EDT)?/i;
+      // Handle GMT-5 format: "May 30 at 2:15AM GMT-5"
+      const regex = /([A-Za-z]+)\s+(\d+)\s+at\s+(\d+):(\d+)(AM|PM)\s+GMT-5/i;
       const match = dateStr.match(regex);
 
       if (match) {
-        const [_, month, day, hour = '0', minute = '0', ampm = 'am', timezone = 'PDT'] = match;
+        const [_, month, day, hour, minute, ampm] = match;
         
         // Convert to 24-hour format
         let hours = parseInt(hour);
-        if (ampm.toLowerCase() === 'pm' && hours < 12) hours += 12;
-        if (ampm.toLowerCase() === 'am' && hours === 12) hours = 0;
+        if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
+        if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
 
-        // Create date in local timezone
+        // Create date in GMT-5
         const date = new Date();
         date.setMonth(new Date(`${month} 1`).getMonth());
         date.setDate(parseInt(day));
         date.setHours(hours, parseInt(minute), 0, 0);
 
-        // Adjust for timezone if needed
-        if (timezone === 'PDT') {
-          date.setHours(date.getHours() + 3); // PDT is UTC-7
-        } else if (timezone === 'EDT') {
-          date.setHours(date.getHours() + 4); // EDT is UTC-4
-        }
+        // Convert GMT-5 to UTC (add 5 hours)
+        date.setHours(date.getHours() + 5);
 
         return date;
       }
