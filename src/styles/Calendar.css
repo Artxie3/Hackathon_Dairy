@@ -139,7 +139,7 @@
 /* Calendar Day Cell */
 .calendar-day {
   position: relative;
-  min-height: 80px;
+  min-height: 60px;
   padding: 0.5rem;
   background: white;
   cursor: pointer;

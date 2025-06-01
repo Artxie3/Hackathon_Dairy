@@ -41,6 +41,7 @@
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: auto auto;
   gap: 1.5rem;
 }
 
@@ -159,7 +160,7 @@
 /* Recent Commits */
 .recent-commits-card {
   grid-column: span 1;
-  grid-row: span 2;
+  grid-row: span 1;
 }
 
 .commits-list {

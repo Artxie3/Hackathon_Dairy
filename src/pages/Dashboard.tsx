@@ -174,7 +174,7 @@ const Dashboard: React.FC = () => {
                 </div>
               </li>
             ) : (
-              stats.recentCommits.slice(0, 6).map(commit => (
+              stats.recentCommits.slice(0, 3).map(commit => (
                 <li key={commit.sha} className="commit-item">
                   <div className="commit-info">
                     <p className="commit-message">{commit.message}</p>

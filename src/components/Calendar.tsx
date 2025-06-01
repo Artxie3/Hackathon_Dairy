@@ -20,10 +20,10 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
   const { entries, temporaryDrafts } = useDiary();
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  const weekDays = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const months = [
-    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
   // Generate calendar days for current month
@@ -115,7 +115,7 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
           <button
             onClick={() => navigateMonth('prev')}
             className="nav-button"
-            title="Mes anterior"
+            title="Previous month"
           >
             <ChevronLeft size={20} />
           </button>
@@ -127,7 +127,7 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
           <button
             onClick={() => navigateMonth('next')}
             className="nav-button"
-            title="Siguiente mes"
+            title="Next month"
           >
             <ChevronRight size={20} />
           </button>
@@ -137,7 +137,7 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
           onClick={goToToday}
           className="today-button"
         >
-          Hoy
+          Today
         </button>
       </div>
 
@@ -167,7 +167,7 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
             onClick={() => handleDateClick(day)}
             title={
               day.hasEntries 
-                ? `${day.entriesCount} ${day.entriesCount === 1 ? 'entrada' : 'entradas'} - ${day.date.toLocaleDateString()}`
+                ? `${day.entriesCount} ${day.entriesCount === 1 ? 'entry' : 'entries'} - ${day.date.toLocaleDateString()}`
                 : day.date.toLocaleDateString()
             }
           >
@@ -199,11 +199,11 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
       <div className="calendar-legend">
         <div className="legend-item">
           <div className="legend-dot has-entries"></div>
-          <span>Días con entradas</span>
+          <span>Days with entries</span>
         </div>
         <div className="legend-item">
           <div className="legend-dot today"></div>
-          <span>Hoy</span>
+          <span>Today</span>
         </div>
       </div>
     </div>
