@@ -115,19 +115,20 @@ const Hackathons: React.FC = () => {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    // Since dates are stored in UTC and represent GMT-5 times,
-    // we need to display them as GMT-5 times
-    const gmt5Offset = -5 * 60; // GMT-5 in minutes
-    const gmt5Date = new Date(date.getTime() + (gmt5Offset * 60 * 1000));
+    // Since dates are stored in UTC but represent GMT-5 times originally,
+    // we display them in GMT-5 by subtracting 5 hours from UTC
+    const gmt5Date = new Date(date.getTime() - (5 * 60 * 60 * 1000));
     
     return gmt5Date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
+      timeZone: 'UTC' // Force UTC display of our adjusted time
     }) + ' ' + gmt5Date.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
-      hour12: true
+      hour12: true,
+      timeZone: 'UTC' // Force UTC display of our adjusted time
     });
   };
 
@@ -135,33 +136,36 @@ const Hackathons: React.FC = () => {
     const date = new Date(dateString);
     
     // Display the time as it was originally in GMT-5
-    // Since we stored it correctly in UTC, we convert back to GMT-5 for display
-    const gmt5Offset = -5 * 60; // GMT-5 in minutes  
-    const gmt5Date = new Date(date.getTime() + (gmt5Offset * 60 * 1000));
+    // Subtract 5 hours from UTC to get back to GMT-5
+    const gmt5Date = new Date(date.getTime() - (5 * 60 * 60 * 1000));
     
     const gmt5Time = gmt5Date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
+      timeZone: 'UTC'
     }) + ' ' + gmt5Date.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
-      hour12: true
+      hour12: true,
+      timeZone: 'UTC'
     });
     
     if (timezone !== 'GMT-5') {
-      // Calculate user's timezone time
-      const userOffset = parseFloat(timezone.replace('GMT', '')) * 60; // Convert to minutes
-      const userDate = new Date(date.getTime() + (userOffset * 60 * 1000));
+      // Calculate user's timezone time by converting from original UTC
+      const userOffsetHours = parseFloat(timezone.replace('GMT', ''));
+      const userDate = new Date(date.getTime() + (userOffsetHours * 60 * 60 * 1000));
       
       const userTime = userDate.toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
-        year: 'numeric'
+        year: 'numeric',
+        timeZone: 'UTC'
       }) + ' ' + userDate.toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
-        hour12: true
+        hour12: true,
+        timeZone: 'UTC'
       });
       
       return (
@@ -215,7 +219,10 @@ const Hackathons: React.FC = () => {
       // Convert dates to the format expected by datetime-local inputs
       const formatDateForInput = (isoString: string) => {
         const date = new Date(isoString);
-        return date.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+        // Convert UTC back to GMT-5 for form input
+        // Since the UTC date represents a GMT-5 time + 5 hours, subtract 5 hours
+        const gmt5Date = new Date(date.getTime() - (5 * 60 * 60 * 1000));
+        return gmt5Date.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
       };
 
       // Update form data with scraped information
