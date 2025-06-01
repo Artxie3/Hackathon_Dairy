@@ -121,14 +121,12 @@ export class DevpostScraper {
       // Look for the schedule table
       const scheduleRows = doc.querySelectorAll('table tr');
       let submissionsRow = null;
-      let judgingRow = null;
 
       for (const row of scheduleRows) {
         const text = row.textContent?.toLowerCase() || '';
         if (text.includes('submission')) {
           submissionsRow = row;
-        } else if (text.includes('judging')) {
-          judgingRow = row;
+          break;
         }
       }
 
@@ -138,7 +136,7 @@ export class DevpostScraper {
           const beginText = cells[0].textContent?.trim() || '';
           const endText = cells[1].textContent?.trim() || '';
 
-          // Parse dates with GMT-5 timezone
+          // Parse dates with exact GMT-5 times
           const startDate = this.parseDevpostDate(beginText);
           const endDate = this.parseDevpostDate(endText);
 
@@ -162,33 +160,48 @@ export class DevpostScraper {
 
   private static parseDevpostDate(dateStr: string): Date | null {
     try {
-      // Handle GMT-5 format: "May 30 at 2:15AM GMT-5"
-      const regex = /([A-Za-z]+)\s+(\d+)\s+at\s+(\d+):(\d+)(AM|PM)\s+GMT-5/i;
-      const match = dateStr.match(regex);
+      // First, clean up the date string
+      const cleanDateStr = dateStr.trim()
+        .replace(/\s+/g, ' ') // Normalize spaces
+        .replace(/\.$/, ''); // Remove trailing period
+
+      // Match pattern like "May 30 at 2:15AM GMT-5"
+      const regex = /([A-Za-z]+)\s+(\d+)\s+at\s+(\d+):(\d+)\s*(AM|PM)\s*GMT-5/i;
+      const match = cleanDateStr.match(regex);
 
       if (match) {
-        const [_, month, day, hour, minute, ampm] = match;
+        const [_, month, day, hourStr, minuteStr, ampm] = match;
         
+        // Parse components
+        const monthIndex = new Date(`${month} 1`).getMonth();
+        const dayNum = parseInt(day, 10);
+        let hour = parseInt(hourStr, 10);
+        const minute = parseInt(minuteStr, 10);
+
         // Convert to 24-hour format
-        let hours = parseInt(hour);
-        if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
-        if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
+        if (ampm.toUpperCase() === 'PM' && hour < 12) {
+          hour += 12;
+        } else if (ampm.toUpperCase() === 'AM' && hour === 12) {
+          hour = 0;
+        }
 
-        // Create date in GMT-5
-        const date = new Date();
-        date.setMonth(new Date(`${month} 1`).getMonth());
-        date.setDate(parseInt(day));
-        date.setHours(hours, parseInt(minute), 0, 0);
-
-        // Convert GMT-5 to UTC (add 5 hours)
-        date.setHours(date.getHours() + 5);
+        // Create date in UTC
+        const date = new Date(Date.UTC(2025, monthIndex, dayNum));
+        
+        // Set time (GMT-5 is UTC-5)
+        // So if it's 2:15 AM GMT-5, it's 7:15 AM UTC
+        const utcHour = (hour + 5) % 24; // Add 5 hours for UTC
+        date.setUTCHours(utcHour, minute, 0, 0);
 
         return date;
       }
+
+      console.warn('Failed to parse date:', cleanDateStr);
+      return null;
     } catch (error) {
       console.error('Error parsing date:', dateStr, error);
+      return null;
     }
-    return null;
   }
 
   private static getDefaultDates(): { startDate: string; endDate: string; submissionDeadline: string } {
@@ -228,13 +241,24 @@ export class DevpostScraper {
   }
 
   private static extractOrganizer(doc: Document): string {
-    // Try to find organizer information
+    // First try to find the organizer tag that's commonly used for hackathon sponsors
+    const tagElements = doc.querySelectorAll('.tag, [class*="tag"]');
+    for (const tag of tagElements) {
+      const text = tag.textContent?.trim();
+      if (text && !text.match(/^(Beginner|Low|No|Code|Machine|Learning|AI)$/i)) {
+        return text;
+      }
+    }
+
+    // Try to find organizer information from standard selectors
     const organizerSelectors = [
       '[data-testid="organizer"]',
       '.organizer',
       '.hackathon-organizer',
       '.sponsor',
-      '.presented-by'
+      '.presented-by',
+      '[class*="sponsor"]',
+      '[class*="partner"]'
     ];
 
     for (const selector of organizerSelectors) {
@@ -246,17 +270,22 @@ export class DevpostScraper {
 
     // Try to extract from title (e.g., "Hackathon presented by Company")
     const title = doc.querySelector('h1')?.textContent || '';
-    const presentedByMatch = title.match(/presented by (.+?)$/i);
+    const presentedByMatch = title.match(/presented by (.+?)(?:\s*$|\s*\|)/i);
     if (presentedByMatch) {
       return presentedByMatch[1].trim();
     }
 
-    // Look for sponsor information
-    const sponsorElement = doc.querySelector('[class*="sponsor"], [class*="partner"]');
-    if (sponsorElement?.textContent?.trim()) {
-      return sponsorElement.textContent.trim();
+    // Look for any element containing "presented by" text
+    const allElements = doc.querySelectorAll('*');
+    for (const element of allElements) {
+      const text = element.textContent || '';
+      const match = text.match(/presented by (.+?)(?:\s*$|\s*\|)/i);
+      if (match) {
+        return match[1].trim();
+      }
     }
 
+    // Return Unknown Organizer if nothing is found
     return 'Unknown Organizer';
   }
 

@@ -3,8 +3,9 @@ import { Plus, Calendar, Clock, Trophy, ExternalLink, Edit, Trash2, Users, Code,
 import { useHackathons, Hackathon } from '../contexts/HackathonContext';
 import { DevpostScraper } from '../utils/devpostScraper';
 import '../styles/Hackathons.css';
-import { format } from 'date-fns';
+import { format, formatInTimeZone } from 'date-fns-tz';
 import { useSettings } from '../contexts/SettingsContext';
+import { addMinutes } from 'date-fns';
 
 const Hackathons: React.FC = () => {
   const { 
@@ -116,12 +117,27 @@ const Hackathons: React.FC = () => {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return format(date, 'MMM d, yyyy h:mma');
+    return format(date, 'MMM d, yyyy h:mm a');
   };
 
-  const formatDateWithTimezone = (dateString: string) => {
+  const formatDateWithTimezone = (dateString: string, targetTimezone: string = 'GMT-5') => {
     const date = new Date(dateString);
-    return `${format(date, 'MMM d, yyyy h:mma')} ${timezone}`;
+    // Format in both GMT-5 and user's timezone if they're different
+    const gmt5Time = formatInTimeZone(date, 'America/New_York', 'MMM d, yyyy h:mm a');
+    
+    if (timezone !== 'GMT-5') {
+      const localTime = format(date, 'MMM d, yyyy h:mm a');
+      return (
+        <span>
+          {gmt5Time} GMT-5
+          <span className="timezone-notice">
+            ({localTime} {timezone})
+          </span>
+        </span>
+      );
+    }
+    
+    return `${gmt5Time} GMT-5`;
   };
 
   const getStatusColor = (status: string) => {
