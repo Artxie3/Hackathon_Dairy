@@ -31,20 +31,12 @@
 }
 
 .dashboard-card {
-  background-color: white;
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  padding: 1.25rem;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.dark-theme .dashboard-card {
-  background-color: var(--color-dark-card);
+  @apply bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6;
+  transition: transform 0.2s ease-in-out;
 }
 
 .dashboard-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .card-header {
@@ -432,5 +424,47 @@
 @media (max-width: 480px) {
   .stats-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Chart animations */
+.chart-bar {
+  transition: height 0.3s ease-in-out;
+}
+
+/* Activity feed animations */
+.activity-item {
+  @apply transition-all duration-200;
+}
+
+.activity-item:hover {
+  @apply bg-gray-100 dark:bg-gray-700;
+}
+
+/* Language bar animations */
+.language-bar {
+  animation: grow 1s ease-out forwards;
+}
+
+@keyframes grow {
+  from {
+    width: 0;
+  }
+  to {
+    width: var(--percentage);
+  }
+}
+
+/* Loading state pulse animation */
+.loading-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
   }
 }
