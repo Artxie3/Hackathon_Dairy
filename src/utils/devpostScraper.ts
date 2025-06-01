@@ -241,51 +241,133 @@ export class DevpostScraper {
   }
 
   private static extractOrganizer(doc: Document): string {
-    // First try to find the organizer tag that's commonly used for hackathon sponsors
-    const tagElements = doc.querySelectorAll('.tag, [class*="tag"]');
-    for (const tag of tagElements) {
-      const text = tag.textContent?.trim();
-      if (text && !text.match(/^(Beginner|Low|No|Code|Machine|Learning|AI)$/i)) {
-        return text;
-      }
-    }
-
-    // Try to find organizer information from standard selectors
+    // Try to find organizer information from various selectors
     const organizerSelectors = [
+      // Look for sponsor/organizer badges or tags
       '[data-testid="organizer"]',
       '.organizer',
       '.hackathon-organizer',
+      '.sponsor-name',
       '.sponsor',
       '.presented-by',
+      // Look for company/organization links or badges
+      'a[href*="stackblitz"]',
+      'a[href*="bolt"]',
+      // Look for badges or chips that might contain organizer info
+      '.badge',
+      '.chip',
+      '.tag',
+      // Look for sponsor sections
       '[class*="sponsor"]',
-      '[class*="partner"]'
+      '[class*="partner"]',
+      '[class*="organizer"]'
     ];
 
     for (const selector of organizerSelectors) {
-      const element = doc.querySelector(selector);
-      if (element?.textContent?.trim()) {
-        return element.textContent.trim();
+      const elements = doc.querySelectorAll(selector);
+      for (const element of elements) {
+        const text = element.textContent?.trim();
+        if (text && text.length > 2 && text.length < 100) {
+          // Skip common non-organizer text
+          if (!text.match(/^(managed|by|devpost|hackathon|join|create|edit|project|view|participants?)$/i)) {
+            return text;
+          }
+        }
       }
     }
 
     // Try to extract from title (e.g., "Hackathon presented by Company")
-    const title = doc.querySelector('h1')?.textContent || '';
-    const presentedByMatch = title.match(/presented by (.+?)(?:\s*$|\s*\|)/i);
-    if (presentedByMatch) {
-      return presentedByMatch[1].trim();
-    }
-
-    // Look for any element containing "presented by" text
-    const allElements = doc.querySelectorAll('*');
-    for (const element of allElements) {
-      const text = element.textContent || '';
-      const match = text.match(/presented by (.+?)(?:\s*$|\s*\|)/i);
-      if (match) {
-        return match[1].trim();
+    const titleElement = doc.querySelector('h1');
+    if (titleElement?.textContent) {
+      const title = titleElement.textContent.trim();
+      
+      // Look for "presented by" pattern
+      const presentedByMatch = title.match(/presented by (.+?)(?:\s*$|\s*:|\s*-)/i);
+      if (presentedByMatch) {
+        return presentedByMatch[1].trim();
+      }
+      
+      // Look for "by" pattern
+      const byMatch = title.match(/\s+by\s+(.+?)(?:\s*$|\s*:|\s*-)/i);
+      if (byMatch) {
+        return byMatch[1].trim();
       }
     }
 
-    // Return Unknown Organizer if nothing is found
+    // Look for text patterns that might indicate organizer
+    const bodyText = doc.body?.textContent || '';
+    
+    // Look for "Managed by" pattern
+    const managedByMatch = bodyText.match(/Managed by\s+([^.\n]+)/i);
+    if (managedByMatch) {
+      const organizer = managedByMatch[1].trim();
+      if (organizer && organizer.length < 50) {
+        return organizer;
+      }
+    }
+
+    // Look for company names in common patterns
+    const companyPatterns = [
+      /(?:Sponsored by|Organized by|Hosted by)\s+([^.\n,]+)/i,
+      /([A-Z][a-zA-Z\s&\/]{2,30})\s+(?:presents|hosts|organizes)/i
+    ];
+
+    for (const pattern of companyPatterns) {
+      const match = bodyText.match(pattern);
+      if (match && match[1]) {
+        const organizer = match[1].trim();
+        if (organizer.length > 2 && organizer.length < 50) {
+          return organizer;
+        }
+      }
+    }
+
+    // Look for meta tags that might contain organizer info
+    const metaOrganizer = doc.querySelector('meta[name="organizer"], meta[property="organizer"]');
+    if (metaOrganizer) {
+      const content = metaOrganizer.getAttribute('content');
+      if (content?.trim()) {
+        return content.trim();
+      }
+    }
+
+    // Look for structured data (JSON-LD)
+    const jsonLdScripts = doc.querySelectorAll('script[type="application/ld+json"]');
+    for (const script of jsonLdScripts) {
+      try {
+        const data = JSON.parse(script.textContent || '');
+        if (data.organizer?.name) {
+          return data.organizer.name;
+        }
+        if (data.sponsor?.name) {
+          return data.sponsor.name;
+        }
+      } catch (e) {
+        // Continue if JSON parsing fails
+      }
+    }
+
+    // Last resort: look for any text that looks like a company name
+    const allText = doc.body?.textContent || '';
+    const companyLikePatterns = [
+      /([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*(?:\s*\/\s*[A-Z][a-zA-Z]+)*)/g
+    ];
+
+    for (const pattern of companyLikePatterns) {
+      const matches = Array.from(allText.matchAll(pattern));
+      for (const match of matches) {
+        const candidate = match[1].trim();
+        // Filter out common non-organizer words
+        if (candidate.length > 3 && candidate.length < 40 && 
+            !candidate.match(/^(Devpost|Hackathon|Project|Join|Create|Edit|View|Public|Online|Participants?|Winners?|Prizes?|Rules?|Updates?|Discussions?|Resources?|Gallery)$/i)) {
+          // If it contains "Bolt" or "StackBlitz" or similar tech company patterns, it's likely the organizer
+          if (candidate.match(/(?:Bolt|StackBlitz|Tech|Labs|Inc|Corp|LLC|Ltd|Co\.|Company)/i)) {
+            return candidate;
+          }
+        }
+      }
+    }
+
     return 'Unknown Organizer';
   }
 
