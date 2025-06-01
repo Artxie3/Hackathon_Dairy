@@ -128,9 +128,12 @@ const HackathonDeadlines: React.FC = () => {
       </div>
 
       {error && (
-        <div className="error-message">
+        <div className={`error-message ${error.includes('demo data') ? 'demo-mode' : ''}`}>
           <AlertTriangle size={16} />
-          <span>{error}</span>
+          <span>{error.includes('demo data') ? 
+            '📊 Demo Mode: Showing sample data while Devpost API is unavailable' : 
+            error
+          }</span>
         </div>
       )}
 

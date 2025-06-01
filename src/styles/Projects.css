@@ -232,6 +232,19 @@
   color: #fca5a5;
 }
 
+/* Demo mode styling - more informative, less alarming */
+.error-message.demo-mode {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border: 1px solid #3b82f6;
+}
+
+.dark-theme .error-message.demo-mode {
+  background: rgba(29, 78, 216, 0.1);
+  color: #93c5fd;
+  border: 1px solid #3b82f6;
+}
+
 /* Filters */
 .filters {
   display: flex;

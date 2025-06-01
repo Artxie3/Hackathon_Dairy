@@ -260,8 +260,11 @@ const Projects: React.FC = () => {
       </div>
 
       {error && (
-        <div className="error-message">
-          <span>{error}</span>
+        <div className={`error-message ${error.includes('demo data') ? 'demo-mode' : ''}`}>
+          <span>{error.includes('demo data') ? 
+            '📊 Demo Mode: Showing sample hackathon projects while Devpost API is unavailable' : 
+            error
+          }</span>
         </div>
       )}
 
