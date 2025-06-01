@@ -162,12 +162,16 @@ export class DevpostScraper {
         .replace(/\s+/g, ' ')
         .replace(/\.$/, '');
 
+      console.log('Parsing date:', cleanDateStr);
+
       // Handle GMT-5 format: "May 30 at 2:15AM GMT-5"
       const regex = /([A-Za-z]+)\s+(\d+)\s+at\s+(\d+):(\d+)\s*(AM|PM)\s*GMT-5/i;
       const match = cleanDateStr.match(regex);
 
       if (match) {
         const [_, month, day, hourStr, minuteStr, ampm] = match;
+        
+        console.log('Matched components:', { month, day, hourStr, minuteStr, ampm });
         
         // Parse components
         const monthIndex = new Date(`${month} 1, 2025`).getMonth();
@@ -182,14 +186,35 @@ export class DevpostScraper {
           hour = 0;
         }
 
-        // Create date in GMT-5 (Eastern Time)
-        // GMT-5 is 5 hours behind UTC
-        const date = new Date();
-        date.setFullYear(2025, monthIndex, dayNum);
-        date.setHours(hour, minute, 0, 0);
+        console.log('Parsed time components:', { monthIndex, dayNum, hour, minute });
+
+        // Create date directly in UTC
+        // GMT-5 means we need to add 5 hours to get UTC
+        // So if it's 2:15 AM GMT-5, it's 7:15 AM UTC
+        const utcHour = (hour + 5) % 24;
+        let utcDay = dayNum;
+        let utcMonth = monthIndex;
+        let utcYear = 2025;
+
+        // Handle day overflow when adding hours
+        if (hour + 5 >= 24) {
+          utcDay += 1;
+          // Handle month overflow
+          const daysInMonth = new Date(utcYear, utcMonth + 1, 0).getDate();
+          if (utcDay > daysInMonth) {
+            utcDay = 1;
+            utcMonth += 1;
+            if (utcMonth > 11) {
+              utcMonth = 0;
+              utcYear += 1;
+            }
+          }
+        }
+
+        const utcDate = new Date(Date.UTC(utcYear, utcMonth, utcDay, utcHour, minute, 0, 0));
         
-        // Convert to UTC by adding 5 hours
-        const utcDate = new Date(date.getTime() + (5 * 60 * 60 * 1000));
+        console.log('Created UTC date:', utcDate.toISOString());
+        console.log('GMT-5 equivalent:', new Date(utcDate.getTime() - 5 * 60 * 60 * 1000).toLocaleString());
         
         return utcDate;
       }

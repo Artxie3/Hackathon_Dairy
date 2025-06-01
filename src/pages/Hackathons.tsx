@@ -120,16 +120,40 @@ const Hackathons: React.FC = () => {
 
   const formatDateWithTimezone = (dateString: string, targetTimezone: string = 'GMT-5') => {
     const date = new Date(dateString);
-    // Format in both GMT-5 and user's timezone if they're different
-    const gmt5Time = formatInTimeZone(date, 'America/New_York', 'MMM d, yyyy h:mm a');
+    
+    // Convert UTC date to GMT-5 for display
+    const gmt5Offset = -5; // GMT-5 is 5 hours behind UTC
+    const gmt5Date = new Date(date.getTime() + (gmt5Offset * 60 * 60 * 1000));
+    
+    const gmt5Time = gmt5Date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    }) + ' ' + gmt5Date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
     
     if (timezone !== 'GMT-5') {
-      const localTime = format(date, 'MMM d, yyyy h:mm a');
+      // Also show user's local time
+      const userOffset = parseFloat(timezone.replace('GMT', ''));
+      const userDate = new Date(date.getTime() + (userOffset * 60 * 60 * 1000));
+      const userTime = userDate.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      }) + ' ' + userDate.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+      
       return (
         <span>
           {gmt5Time} GMT-5
           <span className="timezone-notice">
-            ({localTime} {timezone})
+            ({userTime} {timezone})
           </span>
         </span>
       );
