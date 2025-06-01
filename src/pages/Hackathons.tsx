@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Plus, Calendar, Clock, Trophy, ExternalLink, Edit, Trash2, Users, Code, AlertCircle } from 'lucide-react';
+import { Plus, Calendar, Clock, Trophy, ExternalLink, Edit, Trash2, Users, Code, AlertCircle, Download, Loader } from 'lucide-react';
 import { useHackathons, Hackathon } from '../contexts/HackathonContext';
+import { DevpostScraper } from '../utils/devpostScraper';
 import '../styles/Hackathons.css';
 
 const Hackathons: React.FC = () => {
@@ -19,6 +20,9 @@ const Hackathons: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'all' | 'ongoing' | 'upcoming' | 'completed'>('all');
   const [isCreating, setIsCreating] = useState(false);
   const [editingHackathon, setEditingHackathon] = useState<Hackathon | null>(null);
+  const [importUrl, setImportUrl] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<Hackathon>>({
     title: '',
     organizer: '',
@@ -128,6 +132,71 @@ const Hackathons: React.FC = () => {
     return diffDays;
   };
 
+  const handleImportFromDevpost = async () => {
+    if (!importUrl.trim()) {
+      setImportError('Please enter a Devpost URL');
+      return;
+    }
+
+    if (!importUrl.includes('devpost.com')) {
+      setImportError('Please enter a valid Devpost URL');
+      return;
+    }
+
+    setIsImporting(true);
+    setImportError(null);
+
+    try {
+      const scrapedData = await DevpostScraper.scrapeHackathon(importUrl);
+      
+      // Convert dates to the format expected by datetime-local inputs
+      const formatDateForInput = (isoString: string) => {
+        const date = new Date(isoString);
+        return date.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+      };
+
+      // Update form data with scraped information
+      setFormData({
+        ...formData,
+        title: scrapedData.title,
+        organizer: scrapedData.organizer,
+        description: scrapedData.description,
+        startDate: formatDateForInput(scrapedData.startDate),
+        endDate: formatDateForInput(scrapedData.endDate),
+        submissionDeadline: formatDateForInput(scrapedData.submissionDeadline),
+        status: scrapedData.status,
+        devpostUrl: scrapedData.devpostUrl,
+        prizes: scrapedData.prizes,
+      });
+
+      setImportUrl(''); // Clear the import URL field
+      
+      // Show success message
+      console.log('Successfully imported hackathon data:', scrapedData);
+      
+    } catch (error) {
+      console.error('Import failed:', error);
+      
+      // If scraping fails, try to extract basic info from URL
+      try {
+        const basicData = DevpostScraper.extractFromUrl(importUrl);
+        setFormData({
+          ...formData,
+          ...basicData,
+        });
+        setImportError('Partial import successful - please verify and complete the details');
+      } catch (fallbackError) {
+        setImportError(error instanceof Error ? error.message : 'Failed to import hackathon data');
+      }
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleQuickImport = (url: string) => {
+    setImportUrl(url);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -233,6 +302,82 @@ const Hackathons: React.FC = () => {
             <h2 className="text-xl font-semibold mb-4">
               {editingHackathon ? 'Edit Hackathon' : 'Add Hackathon'}
             </h2>
+
+            {/* Devpost Import Section */}
+            {!editingHackathon && (
+              <div className="import-section">
+                <h3 className="text-lg font-medium mb-3 flex items-center gap-2">
+                  <Download size={18} />
+                  Import from Devpost
+                </h3>
+                <div className="import-controls">
+                  <div className="import-input-group">
+                    <input
+                      type="url"
+                      value={importUrl}
+                      onChange={(e) => {
+                        setImportUrl(e.target.value);
+                        setImportError(null);
+                      }}
+                      placeholder="https://hackathon-name.devpost.com/"
+                      className="import-url-input"
+                      disabled={isImporting}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleImportFromDevpost}
+                      disabled={isImporting || !importUrl.trim()}
+                      className="import-btn"
+                    >
+                      {isImporting ? (
+                        <>
+                          <Loader size={16} className="animate-spin" />
+                          Importing...
+                        </>
+                      ) : (
+                        <>
+                          <Download size={16} />
+                          Import
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  
+                  {importError && (
+                    <div className="import-error">
+                      <AlertCircle size={16} />
+                      {importError}
+                    </div>
+                  )}
+
+                  {/* Quick Import Examples */}
+                  <div className="quick-import">
+                    <p className="quick-import-label">Quick examples:</p>
+                    <div className="quick-import-buttons">
+                      <button
+                        type="button"
+                        onClick={() => handleQuickImport('https://worldslargesthackathon.devpost.com/')}
+                        className="quick-import-btn"
+                      >
+                        World's Largest Hackathon
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickImport('https://devpost.com/hackathons')}
+                        className="quick-import-btn"
+                      >
+                        Browse Devpost
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="divider">
+                  <span>or enter manually</span>
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="hackathon-form">
               <div className="form-row">
                 <div className="form-group">
@@ -317,6 +462,20 @@ const Hackathons: React.FC = () => {
                   placeholder="https://devpost.com/software/your-project"
                 />
               </div>
+
+              {/* Show imported prizes if any */}
+              {formData.prizes && formData.prizes.length > 0 && (
+                <div className="form-group">
+                  <label>Imported Prizes</label>
+                  <div className="prizes-display">
+                    {formData.prizes.map((prize, index) => (
+                      <span key={index} className="prize-tag">
+                        {prize}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="form-actions">
                 <button type="button" onClick={resetForm} className="btn btn-secondary">
