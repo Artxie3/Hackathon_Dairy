@@ -1,6 +1,5 @@
 interface DevpostHackathonData {
   title: string;
-  organizer: string;
   description: string;
   startDate: string;
   endDate: string;
@@ -93,7 +92,6 @@ export class DevpostScraper {
   private static extractHackathonData(mainDoc: Document, datesDoc: Document, devpostUrl: string): DevpostHackathonData {
     // Extract title and basic info from main page
     const title = this.extractTitle(mainDoc);
-    const organizer = this.extractOrganizer(mainDoc);
     const description = this.extractDescription(mainDoc);
     const participants = this.extractParticipants(mainDoc);
 
@@ -105,7 +103,6 @@ export class DevpostScraper {
 
     return {
       title,
-      organizer,
       description,
       startDate: dates.startDate,
       endDate: dates.endDate,
@@ -121,28 +118,37 @@ export class DevpostScraper {
       // Look for the schedule table
       const scheduleRows = doc.querySelectorAll('table tr');
       let submissionsRow = null;
-      let judgingRow = null;
 
       for (const row of scheduleRows) {
-        const text = row.textContent?.toLowerCase() || '';
-        if (text.includes('submission')) {
-          submissionsRow = row;
-        } else if (text.includes('judging')) {
-          judgingRow = row;
+        const cells = row.querySelectorAll('td');
+        if (cells.length >= 2) {
+          const periodText = cells[0]?.textContent?.toLowerCase() || '';
+          if (periodText.includes('submission')) {
+            submissionsRow = row;
+            break;
+          }
         }
       }
 
       if (submissionsRow) {
         const cells = submissionsRow.querySelectorAll('td');
-        if (cells.length >= 2) {
-          const beginText = cells[0].textContent?.trim() || '';
-          const endText = cells[1].textContent?.trim() || '';
+        if (cells.length >= 3) {
+          // Get the text content from BEGINS and ENDS columns
+          const beginText = cells[1]?.textContent?.trim() || '';
+          const endText = cells[2]?.textContent?.trim() || '';
 
-          // Parse dates with GMT-5 timezone
+          console.log('Parsing dates from schedule:', { beginText, endText });
+
+          // Parse dates with proper GMT-5 handling
           const startDate = this.parseDevpostDate(beginText);
           const endDate = this.parseDevpostDate(endText);
 
           if (startDate && endDate) {
+            console.log('Parsed dates successfully:', { 
+              startDate: startDate.toISOString(), 
+              endDate: endDate.toISOString() 
+            });
+            
             return {
               startDate: startDate.toISOString(),
               endDate: endDate.toISOString(),
@@ -153,6 +159,7 @@ export class DevpostScraper {
       }
 
       // Fallback to default date handling
+      console.log('Using fallback dates');
       return this.getDefaultDates();
     } catch (error) {
       console.error('Error parsing schedule:', error);
@@ -162,6 +169,8 @@ export class DevpostScraper {
 
   private static parseDevpostDate(dateStr: string): Date | null {
     try {
+      console.log('Parsing date string:', dateStr);
+      
       // Handle GMT-5 format: "May 30 at 2:15AM GMT-5" or "June 30 at 4:00PM GMT-5"
       const regex = /([A-Za-z]+)\s+(\d+)\s+at\s+(\d+):(\d+)(AM|PM)\s+GMT-5/i;
       const match = dateStr.match(regex);
@@ -169,19 +178,27 @@ export class DevpostScraper {
       if (match) {
         const [_, month, day, hour, minute, ampm] = match;
         
+        console.log('Date components:', { month, day, hour, minute, ampm });
+        
         // Convert to 24-hour format
         let hours = parseInt(hour);
         if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
         if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
 
-        // Create date for current year (2025)
-        const date = new Date(2025, new Date(`${month} 1, 2025`).getMonth(), parseInt(day));
-        date.setUTCHours(hours + 5, parseInt(minute), 0, 0); // GMT-5 = UTC+5
+        // Create date for 2025 in UTC, accounting for GMT-5
+        const date = new Date();
+        date.setUTCFullYear(2025);
+        date.setUTCMonth(new Date(`${month} 1, 2025`).getMonth());
+        date.setUTCDate(parseInt(day));
+        
+        // GMT-5 means we need to add 5 hours to get UTC
+        date.setUTCHours(hours + 5, parseInt(minute), 0, 0);
 
+        console.log('Created date:', date.toISOString());
         return date;
       }
 
-      // Fallback: try to parse other formats
+      // Fallback: try to parse simpler formats
       const altRegex = /([A-Za-z]+)\s+(\d+)\s+at\s+(\d+):(\d+)(AM|PM)/i;
       const altMatch = dateStr.match(altRegex);
       
@@ -192,7 +209,10 @@ export class DevpostScraper {
         if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
         if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
 
-        const date = new Date(2025, new Date(`${month} 1, 2025`).getMonth(), parseInt(day));
+        const date = new Date();
+        date.setUTCFullYear(2025);
+        date.setUTCMonth(new Date(`${month} 1, 2025`).getMonth());
+        date.setUTCDate(parseInt(day));
         date.setUTCHours(hours + 5, parseInt(minute), 0, 0); // Assume GMT-5
 
         return date;
@@ -237,39 +257,6 @@ export class DevpostScraper {
     }
 
     return 'Untitled Hackathon';
-  }
-
-  private static extractOrganizer(doc: Document): string {
-    // Try to find organizer information
-    const organizerSelectors = [
-      '[data-testid="organizer"]',
-      '.organizer',
-      '.hackathon-organizer',
-      '.sponsor',
-      '.presented-by'
-    ];
-
-    for (const selector of organizerSelectors) {
-      const element = doc.querySelector(selector);
-      if (element?.textContent?.trim()) {
-        return element.textContent.trim();
-      }
-    }
-
-    // Try to extract from title (e.g., "Hackathon presented by Company")
-    const title = doc.querySelector('h1')?.textContent || '';
-    const presentedByMatch = title.match(/presented by (.+?)$/i);
-    if (presentedByMatch) {
-      return presentedByMatch[1].trim();
-    }
-
-    // Look for sponsor information
-    const sponsorElement = doc.querySelector('[class*="sponsor"], [class*="partner"]');
-    if (sponsorElement?.textContent?.trim()) {
-      return sponsorElement.textContent.trim();
-    }
-
-    return 'Unknown Organizer';
   }
 
   private static extractDescription(doc: Document): string {
@@ -360,7 +347,6 @@ export class DevpostScraper {
 
     return {
       title,
-      organizer: 'Unknown Organizer',
       description: 'Imported from Devpost - Details unavailable. Please update manually.',
       startDate,
       endDate,

@@ -29,7 +29,6 @@ const Hackathons: React.FC = () => {
   const [importError, setImportError] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<Hackathon>>({
     title: '',
-    organizer: '',
     description: '',
     startDate: '',
     endDate: '',
@@ -79,7 +78,6 @@ const Hackathons: React.FC = () => {
   const resetForm = () => {
     setFormData({
       title: '',
-      organizer: '',
       description: '',
       startDate: '',
       endDate: '',
@@ -209,7 +207,6 @@ const Hackathons: React.FC = () => {
       setFormData({
         ...formData,
         title: scrapedData.title,
-        organizer: scrapedData.organizer,
         description: scrapedData.description,
         startDate: formatDateForInput(scrapedData.startDate),
         endDate: formatDateForInput(scrapedData.endDate),
@@ -220,9 +217,17 @@ const Hackathons: React.FC = () => {
 
       setImportUrl(''); // Clear the import URL field
       
-      // Show success message
+      // Show success message with timezone info
       console.log('Successfully imported hackathon data:', scrapedData);
+      console.log('All times imported in GMT-5 timezone');
+
+      // Clear any previous errors and show success
+      setImportError(null);
       
+      // Temporarily show a success message
+      const successMessage = 'Successfully imported! All times are in GMT-5 timezone.';
+      console.log(successMessage);
+
     } catch (error) {
       console.error('Import failed:', error);
       
@@ -452,14 +457,6 @@ const Hackathons: React.FC = () => {
                     required
                   />
                 </div>
-                <div className="form-group">
-                  <label>Organizer</label>
-                  <input
-                    type="text"
-                    value={formData.organizer || ''}
-                    onChange={(e) => setFormData({...formData, organizer: e.target.value})}
-                  />
-                </div>
               </div>
 
               <div className="form-group">
@@ -473,7 +470,10 @@ const Hackathons: React.FC = () => {
 
               <div className="form-row">
                 <div className="form-group">
-                  <label>Start Date *</label>
+                  <div className="form-label-with-timezone">
+                    <label>Start Date *</label>
+                    <span className="timezone-indicator">(GMT-5)</span>
+                  </div>
                   <input
                     type="datetime-local"
                     value={formData.startDate || ''}
@@ -482,7 +482,10 @@ const Hackathons: React.FC = () => {
                   />
                 </div>
                 <div className="form-group">
-                  <label>End Date *</label>
+                  <div className="form-label-with-timezone">
+                    <label>End Date *</label>
+                    <span className="timezone-indicator">(GMT-5)</span>
+                  </div>
                   <input
                     type="datetime-local"
                     value={formData.endDate || ''}
@@ -494,13 +497,23 @@ const Hackathons: React.FC = () => {
 
               <div className="form-row">
                 <div className="form-group">
-                  <label>Submission Deadline *</label>
+                  <div className="form-label-with-timezone">
+                    <label>Submission Deadline *</label>
+                    <span className="timezone-indicator">(GMT-5)</span>
+                  </div>
                   <input
                     type="datetime-local"
                     value={formData.submissionDeadline || ''}
                     onChange={(e) => setFormData({...formData, submissionDeadline: e.target.value})}
                     required
                   />
+                  {timezone !== 'GMT-5' && (
+                    <div className="timezone-warning">
+                      <div className="warning-content">
+                        ⚠️ Deadline time is in GMT-5. Your timezone is {timezone}. Double-check the time conversion!
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="form-group">
                   <label>Status</label>
@@ -546,7 +559,6 @@ const Hackathons: React.FC = () => {
             <div className="hackathon-header">
               <div>
                 <h3 className="hackathon-title">{hackathon.title}</h3>
-                <p className="hackathon-organizer">{hackathon.organizer}</p>
               </div>
               <div className="flex gap-2 ml-4">
                 <button
