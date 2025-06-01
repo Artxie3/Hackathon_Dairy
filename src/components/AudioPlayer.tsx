@@ -20,8 +20,24 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, className = '' })
     if (!audio) return;
 
     const handleLoadedMetadata = () => {
-      setDuration(audio.duration);
-      setIsLoading(false);
+      if (audio.duration && isFinite(audio.duration)) {
+        setDuration(audio.duration);
+        setIsLoading(false);
+      }
+    };
+
+    const handleLoadedData = () => {
+      if (audio.duration && isFinite(audio.duration)) {
+        setDuration(audio.duration);
+        setIsLoading(false);
+      }
+    };
+
+    const handleDurationChange = () => {
+      if (audio.duration && isFinite(audio.duration)) {
+        setDuration(audio.duration);
+        setIsLoading(false);
+      }
     };
 
     const handleTimeUpdate = () => {
@@ -34,6 +50,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, className = '' })
     };
 
     const handleCanPlay = () => {
+      if (audio.duration && isFinite(audio.duration)) {
+        setDuration(audio.duration);
+      }
       setIsLoading(false);
     };
 
@@ -42,15 +61,33 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, className = '' })
       console.error('Error loading audio file');
     };
 
+    // Reset states when src changes
+    setIsLoading(true);
+    setDuration(0);
+    setCurrentTime(0);
+    setIsPlaying(false);
+
     // Add event listeners
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('loadeddata', handleLoadedData);
+    audio.addEventListener('durationchange', handleDurationChange);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('canplay', handleCanPlay);
     audio.addEventListener('error', handleError);
 
+    // Force load metadata if not already loaded
+    if (audio.readyState >= 1 && audio.duration && isFinite(audio.duration)) {
+      setDuration(audio.duration);
+      setIsLoading(false);
+    } else {
+      audio.load();
+    }
+
     return () => {
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('loadeddata', handleLoadedData);
+      audio.removeEventListener('durationchange', handleDurationChange);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('canplay', handleCanPlay);
@@ -98,7 +135,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, className = '' })
   };
 
   const formatTime = (time: number) => {
-    if (!isFinite(time) || isNaN(time)) return '0:00';
+    if (!isFinite(time) || isNaN(time) || time < 0) return '0:00';
     
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
@@ -163,7 +200,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, className = '' })
 
         {/* Duration */}
         <span className="text-xs text-gray-500 dark:text-gray-400 font-mono whitespace-nowrap">
-          {formatTime(duration)}
+          {duration > 0 ? formatTime(duration) : '--:--'}
         </span>
       </div>
 
