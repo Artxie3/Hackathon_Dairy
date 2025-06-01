@@ -25,7 +25,6 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
   const [title, setTitle] = useState(entry.title || '');
   const [content, setContent] = useState(entry.content || '');
   const [mood, setMood] = useState(entry.mood || '');
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState(entry.audio_url || '');
   const [error, setError] = useState<string | null>(null);
 
@@ -36,13 +35,12 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
     }
 
     try {
-      // Save the entry with the local audio URL
       await onSave({
         ...entry,
         title: title.trim(),
         content: content.trim(),
         mood,
-        audio_url: audioUrl, // This will be a local blob URL
+        audio_url: audioUrl,
         is_draft: false,
       });
       setError(null);
@@ -52,11 +50,8 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
     }
   };
 
-  const handleAudioComplete = (blob: Blob) => {
-    // Create a local URL for preview and storage
-    const url = URL.createObjectURL(blob);
+  const handleAudioComplete = (url: string) => {
     setAudioUrl(url);
-    setAudioBlob(blob);
     setError(null);
   };
 
@@ -66,11 +61,7 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
   };
 
   const handleRemoveAudio = () => {
-    if (audioUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(audioUrl);
-    }
     setAudioUrl('');
-    setAudioBlob(null);
   };
 
   return (
