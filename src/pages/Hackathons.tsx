@@ -57,6 +57,11 @@ const Hackathons: React.FC = () => {
     try {
       const date = new Date(isoString);
       
+      // Validate timezones
+      if (!toTz || toTz.trim() === '') {
+        toTz = 'UTC';
+      }
+      
       // Format in target timezone
       const converted = new Intl.DateTimeFormat('en-US', {
         timeZone: toTz,
@@ -76,24 +81,48 @@ const Hackathons: React.FC = () => {
 
       return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
     } catch (error) {
+      console.warn('Timezone conversion failed, returning original:', error);
       return isoString;
     }
   };
 
   const formatTimeWithTimezone = (isoString: string, timezone: string, label: string) => {
     const date = new Date(isoString);
-    return new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZoneName: 'short'
-    }).format(date);
+    
+    // Validate timezone before using it
+    if (!timezone || timezone.trim() === '') {
+      timezone = 'UTC';
+    }
+    
+    try {
+      return new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZoneName: 'short'
+      }).format(date);
+    } catch (error) {
+      // Fallback to UTC if timezone is invalid
+      return new Intl.DateTimeFormat('en-US', {
+        timeZone: 'UTC',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZoneName: 'short'
+      }).format(date);
+    }
   };
 
   const mapTimezoneAbbreviation = (tzAbbr: string): string => {
+    if (!tzAbbr || tzAbbr.trim() === '') {
+      return 'UTC';
+    }
+    
     const timezoneMap: { [key: string]: string } = {
       'PDT': 'America/Los_Angeles',
       'PST': 'America/Los_Angeles',
@@ -114,7 +143,7 @@ const Hackathons: React.FC = () => {
       'UTC-7': 'America/Denver',
       'UTC-8': 'America/Los_Angeles',
     };
-    return timezoneMap[tzAbbr] || 'UTC';
+    return timezoneMap[tzAbbr.trim()] || 'UTC';
   };
 
   const getFilteredHackathons = () => {
@@ -211,17 +240,22 @@ const Hackathons: React.FC = () => {
   const formatDateWithTimezone = (dateString: string, originalText?: string) => {
     const date = new Date(dateString);
     
-    // Extract timezone info from notes
+    // Extract timezone info from notes - but handle when there are no notes
     const notes = formData.notes || '';
     const sourceTimezoneMatch = notes.match(/Source timezone: ([^\n]+)/);
-    const sourceTimezone = sourceTimezoneMatch ? sourceTimezoneMatch[1] : null;
+    const sourceTimezone = sourceTimezoneMatch ? sourceTimezoneMatch[1].trim() : null;
+    
+    // Ensure userTimezone is valid
+    const validUserTimezone = userTimezone && userTimezone.trim() !== '' 
+      ? userTimezone 
+      : Intl.DateTimeFormat().resolvedOptions().timeZone;
     
     // Format in user's timezone
-    const userTime = formatTimeWithTimezone(dateString, userTimezone, 'User');
+    const userTime = formatTimeWithTimezone(dateString, validUserTimezone, 'User');
     
-    // Format in source timezone if available
+    // Format in source timezone if available and valid
     let sourceTime = null;
-    if (sourceTimezone) {
+    if (sourceTimezone && sourceTimezone.trim() !== '') {
       const sourceTzName = mapTimezoneAbbreviation(sourceTimezone);
       sourceTime = formatTimeWithTimezone(dateString, sourceTzName, 'Source');
     }
@@ -676,10 +710,26 @@ const Hackathons: React.FC = () => {
                       const deadlineTextLine = hackathon.notes?.split('\n').find(line => line.includes('Imported deadline:'));
                       const originalText = deadlineTextLine?.replace('Imported deadline:', '').trim();
                       
-                      const { userTime, sourceTime, isEstimated, sourceTimezone } = formatDateWithTimezone(
-                        hackathon.submissionDeadline, 
-                        originalText
-                      );
+                      // Use hackathon notes instead of formData.notes for display
+                      const hackathonNotes = hackathon.notes || '';
+                      const sourceTimezoneMatch = hackathonNotes.match(/Source timezone: ([^\n]+)/);
+                      const sourceTimezone = sourceTimezoneMatch ? sourceTimezoneMatch[1].trim() : null;
+                      
+                      // Ensure userTimezone is valid
+                      const validUserTimezone = userTimezone && userTimezone.trim() !== '' 
+                        ? userTimezone 
+                        : Intl.DateTimeFormat().resolvedOptions().timeZone;
+                      
+                      // Format times safely
+                      const userTime = formatTimeWithTimezone(hackathon.submissionDeadline, validUserTimezone, 'User');
+                      
+                      let sourceTime = null;
+                      if (sourceTimezone && sourceTimezone.trim() !== '') {
+                        const sourceTzName = mapTimezoneAbbreviation(sourceTimezone);
+                        sourceTime = formatTimeWithTimezone(hackathon.submissionDeadline, sourceTzName, 'Source');
+                      }
+                      
+                      const isEstimated = originalText?.includes('Estimated') || false;
                       const warning = getTimezoneWarning(hackathon.submissionDeadline);
                       
                       return (
