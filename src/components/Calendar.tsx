@@ -97,7 +97,7 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
       hackathonEventsMap.get(endKey)!.push({
         type: 'end',
         title: hackathon.title,
-        color: '#8b5cf6' // purple
+        color: '#ef4444' // red
       });
 
       // Deadline date
@@ -285,7 +285,7 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
           <span>Submission deadline</span>
         </div>
         <div className="legend-item">
-          <div className="legend-dot hackathon-end" style={{ backgroundColor: '#8b5cf6' }}></div>
+          <div className="legend-dot hackathon-end" style={{ backgroundColor: '#ef4444' }}></div>
           <span>Hackathon ends</span>
         </div>
       </div>
