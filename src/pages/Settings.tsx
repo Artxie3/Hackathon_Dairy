@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GitBranch, RefreshCw, Save, AlertCircle, CheckCircle } from 'lucide-react';
+import { GitBranch, RefreshCw, Save, AlertCircle, CheckCircle, Globe } from 'lucide-react';
 import { useDiary } from '../contexts/DiaryContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -13,6 +13,7 @@ const Settings: React.FC = () => {
   const [emailNotifications, setEmailNotifications] = useState(false);
   const [desktopNotifications, setDesktopNotifications] = useState(false);
   const [theme, setTheme] = useState('system');
+  const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   // Load settings from localStorage
@@ -27,6 +28,7 @@ const Settings: React.FC = () => {
         setEmailNotifications(settings.emailNotifications ?? false);
         setDesktopNotifications(settings.desktopNotifications ?? false);
         setTheme(settings.theme ?? 'system');
+        setTimezone(settings.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
       } catch (error) {
         console.error('Error loading settings:', error);
       }
@@ -43,6 +45,7 @@ const Settings: React.FC = () => {
       emailNotifications,
       desktopNotifications,
       theme,
+      timezone,
     };
 
     try {
@@ -86,6 +89,38 @@ const Settings: React.FC = () => {
   const formatLastSyncTime = (time: Date | null) => {
     if (!time) return 'Never';
     return time.toLocaleString();
+  };
+
+  // Get list of common timezones
+  const getTimezoneList = () => {
+    const timezones = [
+      'UTC',
+      'America/New_York',
+      'America/Chicago',
+      'America/Denver',
+      'America/Los_Angeles',
+      'America/Phoenix',
+      'America/Anchorage',
+      'Pacific/Honolulu',
+      'Europe/London',
+      'Europe/Paris',
+      'Europe/Berlin',
+      'Europe/Moscow',
+      'Asia/Dubai',
+      'Asia/Shanghai',
+      'Asia/Tokyo',
+      'Asia/Singapore',
+      'Australia/Sydney',
+      'Pacific/Auckland'
+    ];
+
+    // Add user's current timezone if not in list
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (!timezones.includes(userTimezone)) {
+      timezones.unshift(userTimezone);
+    }
+
+    return timezones;
   };
 
   return (
@@ -212,6 +247,34 @@ const Settings: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
           <h2 className="text-xl font-semibold mb-6 text-gray-900 dark:text-white">Application Settings</h2>
           <div className="space-y-6">
+            {/* Timezone Settings */}
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <Globe className="text-blue-600 dark:text-blue-400" size={20} />
+                <h3 className="font-medium text-gray-900 dark:text-white">Timezone Settings</h3>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Your Timezone
+                </label>
+                <select 
+                  value={timezone}
+                  onChange={(e) => setTimezone(e.target.value)}
+                  className="form-select block w-full max-w-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-blue-500 focus:border-blue-500"
+                >
+                  {getTimezoneList().map((tz: string) => (
+                    <option key={tz} value={tz}>
+                      {tz.replace(/_/g, ' ')}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                  This timezone will be used to display all dates and times across the application.
+                </p>
+              </div>
+            </div>
+
+            {/* Notifications */}
             <div>
               <h3 className="font-medium text-gray-900 dark:text-white mb-4">Notifications</h3>
               <div className="space-y-4">
@@ -236,6 +299,7 @@ const Settings: React.FC = () => {
               </div>
             </div>
 
+            {/* Theme Preferences */}
             <div>
               <h3 className="font-medium text-gray-900 dark:text-white mb-4">Theme Preferences</h3>
               <div>
