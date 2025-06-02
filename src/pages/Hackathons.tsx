@@ -28,6 +28,7 @@ const Hackathons: React.FC = () => {
   const [userTimezone, setUserTimezone] = useState<string>('');
   const [formData, setFormData] = useState<Partial<Hackathon>>({
     title: '',
+    organizer: '',
     description: '',
     startDate: '',
     endDate: '',
@@ -39,6 +40,7 @@ const Hackathons: React.FC = () => {
     projectUrl: '',
     teamMembers: [],
     technologies: [],
+    prizes: [],
     notes: '',
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
   });
@@ -75,21 +77,71 @@ const Hackathons: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Form submitted with data:', formData);
+    
     try {
-      if (editingHackathon) {
-        await updateHackathon(editingHackathon.id, formData);
-      } else {
-        await addHackathon(formData as Omit<Hackathon, 'id' | 'created_at' | 'updated_at'>);
+      // Validate required fields
+      if (!formData.title?.trim()) {
+        console.error('Title is required');
+        setImportError('Title is required');
+        return;
       }
+      
+      if (!formData.startDate) {
+        console.error('Start date is required');
+        setImportError('Start date is required');
+        return;
+      }
+      
+      if (!formData.endDate) {
+        console.error('End date is required');
+        setImportError('End date is required');
+        return;
+      }
+      
+      if (!formData.submissionDeadline) {
+        console.error('Submission deadline is required');
+        setImportError('Submission deadline is required');
+        return;
+      }
+
+      console.log('Validation passed, attempting to save...');
+      
+      // Ensure all required fields have default values
+      const hackathonData = {
+        ...formData,
+        organizer: formData.organizer || 'Unknown',
+        description: formData.description || '',
+        teamMembers: formData.teamMembers || [],
+        technologies: formData.technologies || [],
+        prizes: formData.prizes || [],
+        notes: formData.notes || '',
+        timezone: formData.timezone || userTimezone
+      };
+      
+      if (editingHackathon) {
+        console.log('Updating hackathon:', editingHackathon.id);
+        await updateHackathon(editingHackathon.id, hackathonData);
+        console.log('Hackathon updated successfully');
+      } else {
+        console.log('Adding new hackathon');
+        const newHackathon = await addHackathon(hackathonData as Omit<Hackathon, 'id' | 'created_at' | 'updated_at'>);
+        console.log('Hackathon added successfully:', newHackathon);
+      }
+      
       resetForm();
+      setImportError(null); // Clear any previous errors
+      console.log('Form reset completed');
     } catch (err) {
       console.error('Error saving hackathon:', err);
+      setImportError(`Failed to save hackathon: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 
   const resetForm = () => {
     setFormData({
       title: '',
+      organizer: '',
       description: '',
       startDate: '',
       endDate: '',
@@ -101,6 +153,7 @@ const Hackathons: React.FC = () => {
       projectUrl: '',
       teamMembers: [],
       technologies: [],
+      prizes: [],
       notes: '',
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
     });
@@ -620,6 +673,14 @@ const Hackathons: React.FC = () => {
             )}
 
             <form onSubmit={handleSubmit} className="hackathon-form">
+              {/* Error Display */}
+              {importError && (
+                <div className="import-error">
+                  <AlertCircle size={16} />
+                  {importError}
+                </div>
+              )}
+
               <div className="form-group">
                 <label>Title *</label>
                 <input
@@ -627,6 +688,16 @@ const Hackathons: React.FC = () => {
                   value={formData.title || ''}
                   onChange={(e) => setFormData({...formData, title: e.target.value})}
                   required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Organizer</label>
+                <input
+                  type="text"
+                  value={formData.organizer || ''}
+                  onChange={(e) => setFormData({...formData, organizer: e.target.value})}
+                  placeholder="Hackathon organizer"
                 />
               </div>
 
