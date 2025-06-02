@@ -156,7 +156,7 @@ const Hackathons: React.FC = () => {
     const date = new Date(dateStr);
     const userTz = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
     
-    // Convert the date to user's timezone
+    // Format the date in user's timezone
     return new Intl.DateTimeFormat('en-US', {
       timeZone: userTz,
       year: 'numeric',
@@ -167,6 +167,30 @@ const Hackathons: React.FC = () => {
       hour12: true,
       timeZoneName: 'short'
     }).format(date);
+  };
+
+  const convertDateToTargetTimezone = (dateStr: string, sourceTimezone: string, targetTimezone: string) => {
+    // Create the date - this interprets it as a local date/time
+    const date = new Date(dateStr);
+    
+    // If no conversion needed, return as-is
+    if (sourceTimezone === targetTimezone) {
+      return date.toISOString();
+    }
+    
+    // Get the offset difference between timezones at this specific date
+    const sourceDate = new Date(date.toLocaleString("sv-SE", { timeZone: sourceTimezone }));
+    const targetDate = new Date(date.toLocaleString("sv-SE", { timeZone: targetTimezone }));
+    const utcDate = new Date(date.toLocaleString("sv-SE", { timeZone: "UTC" }));
+    
+    // Calculate the time difference
+    const sourceOffset = utcDate.getTime() - sourceDate.getTime();
+    const targetOffset = utcDate.getTime() - targetDate.getTime();
+    const adjustment = sourceOffset - targetOffset;
+    
+    // Apply the adjustment
+    const adjustedDate = new Date(date.getTime() + adjustment);
+    return adjustedDate.toISOString();
   };
 
   const handleImportFromDevpost = async () => {
@@ -190,11 +214,26 @@ const Hackathons: React.FC = () => {
       if (scrapedData.timezone && scrapedData.timezone !== userTimezone) {
         // Convert dates to user timezone for preview
         const convertedDates = {
-          startDate: convertToUserTimezone(scrapedData.startDate, scrapedData.timezone),
-          endDate: convertToUserTimezone(scrapedData.endDate, scrapedData.timezone),
-          submissionDeadline: convertToUserTimezone(scrapedData.submissionDeadline, scrapedData.timezone)
+          startDate: convertDateToTargetTimezone(scrapedData.startDate, scrapedData.timezone, userTimezone),
+          endDate: convertDateToTargetTimezone(scrapedData.endDate, scrapedData.timezone, userTimezone),
+          submissionDeadline: convertDateToTargetTimezone(scrapedData.submissionDeadline, scrapedData.timezone, userTimezone)
         };
-        setConvertedDates(convertedDates);
+        
+        // Format the converted deadline for display in modal
+        const convertedDeadlineFormatted = new Intl.DateTimeFormat('en-US', {
+          timeZone: userTimezone,
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZoneName: 'short'
+        }).format(new Date(convertedDates.submissionDeadline));
+        
+        setConvertedDates({
+          ...convertedDates,
+          submissionDeadline: convertedDeadlineFormatted
+        });
         setShowTimezoneModal(true);
       } else {
         // If timezones match or source timezone is unknown, proceed with import
@@ -225,9 +264,9 @@ const Hackathons: React.FC = () => {
     if (shouldConvert && data.timezone) {
       // Convert dates to user timezone
       dates = {
-        startDate: convertToUserTimezone(data.startDate, data.timezone),
-        endDate: convertToUserTimezone(data.endDate, data.timezone),
-        submissionDeadline: convertToUserTimezone(data.submissionDeadline, data.timezone)
+        startDate: convertDateToTargetTimezone(data.startDate, data.timezone, userTimezone),
+        endDate: convertDateToTargetTimezone(data.endDate, data.timezone, userTimezone),
+        submissionDeadline: convertDateToTargetTimezone(data.submissionDeadline, data.timezone, userTimezone)
       };
     }
 
