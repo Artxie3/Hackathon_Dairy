@@ -21,6 +21,120 @@
   color: var(--color-gray-100);
 }
 
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.stat-card {
+  background: white;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dark-theme .stat-card {
+  background: var(--color-dark-card);
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 0.75rem;
+  color: white;
+  flex-shrink: 0;
+}
+
+.stat-icon.total {
+  background-color: #3b82f6;
+}
+
+.stat-icon.recent {
+  background-color: #10b981;
+}
+
+.stat-icon.drafts {
+  background-color: #f59e0b;
+}
+
+.stat-icon.commits {
+  background-color: #8b5cf6;
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  color: var(--color-gray-500);
+  margin-bottom: 0.25rem;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-gray-900);
+}
+
+.dark-theme .stat-value {
+  color: var(--color-gray-100);
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--color-gray-200);
+}
+
+.dark-theme .tabs {
+  border-bottom-color: var(--color-gray-700);
+}
+
+.tab {
+  padding: 0.75rem 1rem;
+  border: none;
+  background: transparent;
+  color: var(--color-gray-600);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.dark-theme .tab {
+  color: var(--color-gray-400);
+}
+
+.tab:hover {
+  color: var(--color-gray-900);
+  background: var(--color-gray-50);
+}
+
+.dark-theme .tab:hover {
+  color: var(--color-gray-100);
+  background: var(--color-gray-800);
+}
+
+.tab-active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
 .new-entry-btn {
   display: flex;
   align-items: center;

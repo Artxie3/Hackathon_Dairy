@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, Filter, X, Edit, Trash2, GitBranch, RefreshCw, ExternalLink } from 'lucide-react';
+import { Plus, Search, Filter, X, Edit, Trash2, GitBranch, RefreshCw, ExternalLink, BookOpen, FileText, CalendarDays, Users } from 'lucide-react';
 import { useDiary } from '../contexts/DiaryContext';
 import { EntryEditor } from '../components/EntryEditor';
 import { AudioPlayer } from '../components/AudioPlayer';
@@ -23,6 +23,7 @@ const DiaryEntries: React.FC = () => {
   } = useDiary();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<'all' | 'recent' | 'drafts' | 'commits'>('all');
   const [isCreating, setIsCreating] = useState(false);
   const [editingEntry, setEditingEntry] = useState<DiaryEntry | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<DiaryEntry | null>(null);
@@ -30,7 +31,34 @@ const DiaryEntries: React.FC = () => {
   // Get unique tags from all entries
   const allTags = Array.from(new Set(entries.flatMap(entry => entry.tags || [])));
 
-  const filteredEntries = entries.filter(entry => {
+  // Get entries from last 7 days
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const recentEntries = entries.filter(entry => new Date(entry.created_at) >= sevenDaysAgo);
+
+  // Get draft entries
+  const draftEntries = entries.filter(entry => entry.is_draft);
+
+  // Get commit-based entries (entries with commit info)
+  const commitEntries = entries.filter(entry => entry.commit_hash && entry.commit_repo);
+
+  // Filter entries based on active tab
+  const getFilteredEntriesByTab = () => {
+    switch (activeTab) {
+      case 'recent':
+        return recentEntries;
+      case 'drafts':
+        return draftEntries;
+      case 'commits':
+        return commitEntries;
+      default:
+        return entries;
+    }
+  };
+
+  const tabEntries = getFilteredEntriesByTab();
+
+  const filteredEntries = tabEntries.filter(entry => {
     const matchesSearch = searchQuery === '' ||
       entry.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       entry.content.toLowerCase().includes(searchQuery.toLowerCase());
@@ -175,18 +203,13 @@ const DiaryEntries: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Diary Entries</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Last sync: {formatLastSyncTime(lastSyncTime)}
-            {filteredTemporaryDrafts.length > 0 && (
-              <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full text-xs">
-                {filteredTemporaryDrafts.length === 1 ? 'new commit' : `${filteredTemporaryDrafts.length} new commits`}
-              </span>
-            )}
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            Track your hackathon participations and projects
           </p>
         </div>
         <div className="flex gap-3">
@@ -211,6 +234,76 @@ const DiaryEntries: React.FC = () => {
             New Entry
           </button>
         </div>
+      </div>
+
+      {/* Stats Overview */}
+      <div className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-icon total">
+            <BookOpen size={20} />
+          </div>
+          <div>
+            <p className="stat-label">Total Entries</p>
+            <p className="stat-value">{entries.length}</p>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon recent">
+            <CalendarDays size={20} />
+          </div>
+          <div>
+            <p className="stat-label">This Week</p>
+            <p className="stat-value">{recentEntries.length}</p>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon drafts">
+            <FileText size={20} />
+          </div>
+          <div>
+            <p className="stat-label">Drafts</p>
+            <p className="stat-value">{draftEntries.length}</p>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon commits">
+            <GitBranch size={20} />
+          </div>
+          <div>
+            <p className="stat-label">New Commits</p>
+            <p className="stat-value">{temporaryDrafts.length}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Sync Status */}
+      {lastSyncTime && (
+        <div className="mb-6 text-sm text-gray-500 dark:text-gray-400">
+          Last sync: {formatLastSyncTime(lastSyncTime)}
+          {filteredTemporaryDrafts.length > 0 && (
+            <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full text-xs">
+              {filteredTemporaryDrafts.length === 1 ? 'new commit' : `${filteredTemporaryDrafts.length} new commits`}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="tabs">
+        {[
+          { key: 'all', label: 'All', count: entries.length },
+          { key: 'recent', label: 'This Week', count: recentEntries.length },
+          { key: 'drafts', label: 'Drafts', count: draftEntries.length },
+          { key: 'commits', label: 'From Commits', count: commitEntries.length },
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key as any)}
+            className={`tab ${activeTab === tab.key ? 'tab-active' : ''}`}
+          >
+            {tab.label} ({tab.count})
+          </button>
+        ))}
       </div>
 
       {/* Search and Filters */}
@@ -285,8 +378,8 @@ const DiaryEntries: React.FC = () => {
 
       {/* Entries Grid */}
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Temporary Drafts */}
-        {filteredTemporaryDrafts.map(draft => (
+        {/* Temporary Drafts - only show on all or commits tab */}
+        {(activeTab === 'all' || activeTab === 'commits') && filteredTemporaryDrafts.map(draft => (
           <div
             key={draft.id}
             className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 border-2 border-blue-200 dark:border-blue-700 overflow-hidden"
