@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Calendar, Clock, Trophy, ExternalLink, Edit, Trash2, Users, Code, AlertCircle, Download, Loader, Globe } from 'lucide-react';
 import { useHackathons, Hackathon } from '../contexts/HackathonContext';
 import { DevpostScraper } from '../utils/devpostScraper';
+import TimezoneConfirmModal from '../components/TimezoneConfirmModal';
 import '../styles/Hackathons.css';
 
 const Hackathons: React.FC = () => {
@@ -39,7 +40,16 @@ const Hackathons: React.FC = () => {
     teamMembers: [],
     technologies: [],
     notes: '',
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
   });
+
+  const [showTimezoneModal, setShowTimezoneModal] = useState(false);
+  const [importedData, setImportedData] = useState<any>(null);
+  const [convertedDates, setConvertedDates] = useState<{
+    startDate: string;
+    endDate: string;
+    submissionDeadline: string;
+  } | null>(null);
 
   const upcomingDeadlines = getUpcomingDeadlines();
   const ongoingHackathons = getOngoingHackathons();
@@ -92,6 +102,7 @@ const Hackathons: React.FC = () => {
       teamMembers: [],
       technologies: [],
       notes: '',
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
     });
     setIsCreating(false);
     setEditingHackathon(null);
@@ -141,38 +152,21 @@ const Hackathons: React.FC = () => {
     return diffDays;
   };
 
-  const formatDateWithTimezone = (dateString: string, originalText?: string) => {
-    const date = new Date(dateString);
+  const convertToUserTimezone = (dateStr: string, sourceTimezone: string) => {
+    const date = new Date(dateStr);
     const userTz = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
     
-    // Format in user's timezone with clear timezone display
-    const userTime = new Intl.DateTimeFormat('en-US', {
+    // Convert the date to user's timezone
+    return new Intl.DateTimeFormat('en-US', {
       timeZone: userTz,
-      month: 'short',
-      day: 'numeric',
       year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
+      hour12: true,
       timeZoneName: 'short'
     }).format(date);
-
-    // Check if the deadline is estimated
-    const isEstimated = originalText?.includes('Estimated') || false;
-
-    return { userTime, isEstimated, originalText };
-  };
-
-  const getTimezoneWarning = (dateString: string) => {
-    const deadline = new Date(dateString);
-    const now = new Date();
-    const diffHours = (deadline.getTime() - now.getTime()) / (1000 * 60 * 60);
-    
-    if (diffHours < 24 && diffHours > 0) {
-      return 'urgent';
-    } else if (diffHours < 72 && diffHours > 0) {
-      return 'warning';
-    }
-    return null;
   };
 
   const handleImportFromDevpost = async () => {
@@ -191,57 +185,165 @@ const Hackathons: React.FC = () => {
 
     try {
       const scrapedData = await DevpostScraper.scrapeHackathon(importUrl);
-      
-      // Convert dates to the format expected by datetime-local inputs
-      const formatDateForInput = (isoString: string) => {
-        const date = new Date(isoString);
-        return date.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
-      };
+      setImportedData(scrapedData);
 
-      // Update form data with scraped information
-      setFormData({
-        ...formData,
-        title: scrapedData.title,
-        description: scrapedData.description,
-        startDate: formatDateForInput(scrapedData.startDate),
-        endDate: formatDateForInput(scrapedData.endDate),
-        submissionDeadline: formatDateForInput(scrapedData.submissionDeadline),
-        status: scrapedData.status,
-        devpostUrl: scrapedData.devpostUrl,
-        // Store timezone info in notes for now
-        notes: scrapedData.timezone 
-          ? `Imported deadline: ${scrapedData.deadlineText}\nTimezone: ${scrapedData.timezone}`
-          : scrapedData.deadlineText || ''
-      });
-
-      setImportUrl(''); // Clear the import URL field
-      
-      // Show success message with timezone info
-      if (scrapedData.timezone) {
-        console.log(`Successfully imported hackathon with timezone: ${scrapedData.timezone}`);
+      if (scrapedData.timezone && scrapedData.timezone !== userTimezone) {
+        // Convert dates to user timezone for preview
+        const convertedDates = {
+          startDate: convertToUserTimezone(scrapedData.startDate, scrapedData.timezone),
+          endDate: convertToUserTimezone(scrapedData.endDate, scrapedData.timezone),
+          submissionDeadline: convertToUserTimezone(scrapedData.submissionDeadline, scrapedData.timezone)
+        };
+        setConvertedDates(convertedDates);
+        setShowTimezoneModal(true);
+      } else {
+        // If timezones match or source timezone is unknown, proceed with import
+        handleImportConfirm(scrapedData);
       }
-      
+
+      setImportUrl('');
     } catch (error) {
       console.error('Import failed:', error);
-      
-      // If scraping fails, try to extract basic info from URL
-      try {
-        const basicData = DevpostScraper.extractFromUrl(importUrl);
-        setFormData({
-          ...formData,
-          ...basicData,
-        });
-        setImportError('Partial import successful - please verify and complete the details');
-      } catch (fallbackError) {
-        setImportError(error instanceof Error ? error.message : 'Failed to import hackathon data');
-      }
+      handleImportError(error);
     } finally {
       setIsImporting(false);
     }
   };
 
+  const handleImportConfirm = (data: any, shouldConvert = false) => {
+    const formatDateForInput = (dateStr: string) => {
+      const date = new Date(dateStr);
+      return date.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+    };
+
+    let dates = {
+      startDate: data.startDate,
+      endDate: data.endDate,
+      submissionDeadline: data.submissionDeadline
+    };
+
+    if (shouldConvert && data.timezone) {
+      // Convert dates to user timezone
+      dates = {
+        startDate: convertToUserTimezone(data.startDate, data.timezone),
+        endDate: convertToUserTimezone(data.endDate, data.timezone),
+        submissionDeadline: convertToUserTimezone(data.submissionDeadline, data.timezone)
+      };
+    }
+
+    setFormData({
+      ...formData,
+      title: data.title,
+      description: data.description,
+      startDate: formatDateForInput(dates.startDate),
+      endDate: formatDateForInput(dates.endDate),
+      submissionDeadline: formatDateForInput(dates.submissionDeadline),
+      status: data.status,
+      devpostUrl: data.devpostUrl,
+      timezone: shouldConvert ? userTimezone : data.timezone,
+      notes: `Original Timezone: ${data.timezone || 'Unknown'}\nOriginal Deadline: ${data.deadlineText || ''}`
+    });
+
+    setShowTimezoneModal(false);
+    setImportedData(null);
+    setConvertedDates(null);
+  };
+
+  const handleImportError = (error: any) => {
+    try {
+      const basicData = DevpostScraper.extractFromUrl(importUrl);
+      setFormData({
+        ...formData,
+        ...basicData,
+      });
+      setImportError('Partial import successful - please verify and complete the details');
+    } catch (fallbackError) {
+      setImportError(error instanceof Error ? error.message : 'Failed to import hackathon data');
+    }
+  };
+
+  const formatDateWithTimezone = (dateString: string, originalText?: string, sourceTimezone?: string) => {
+    const date = new Date(dateString);
+    const userTz = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
+    // Format in user's timezone
+    const userTime = new Intl.DateTimeFormat('en-US', {
+      timeZone: userTz,
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZoneName: 'short'
+    }).format(date);
+
+    // If we have source timezone info, show both times
+    let displayTime = userTime;
+    if (sourceTimezone && sourceTimezone !== userTz) {
+      const sourceTime = new Intl.DateTimeFormat('en-US', {
+        timeZone: sourceTimezone,
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZoneName: 'short'
+      }).format(date);
+      displayTime = `${userTime} (originally ${sourceTime})`;
+    }
+
+    const isEstimated = originalText?.includes('Estimated') || false;
+
+    return { userTime: displayTime, isEstimated, originalText };
+  };
+
+  const getTimezoneWarning = (dateString: string) => {
+    const deadline = new Date(dateString);
+    const now = new Date();
+    const diffHours = (deadline.getTime() - now.getTime()) / (1000 * 60 * 60);
+    
+    if (diffHours < 24 && diffHours > 0) {
+      return 'urgent';
+    } else if (diffHours < 72 && diffHours > 0) {
+      return 'warning';
+    }
+    return null;
+  };
+
   const handleQuickImport = (url: string) => {
     setImportUrl(url);
+  };
+
+  // Get list of common timezones
+  const getTimezoneList = (): string[] => {
+    const timezones = [
+      'UTC',
+      'America/New_York',
+      'America/Chicago',
+      'America/Denver',
+      'America/Los_Angeles',
+      'America/Phoenix',
+      'America/Anchorage',
+      'Pacific/Honolulu',
+      'Europe/London',
+      'Europe/Paris',
+      'Europe/Berlin',
+      'Europe/Moscow',
+      'Asia/Dubai',
+      'Asia/Shanghai',
+      'Asia/Tokyo',
+      'Asia/Singapore',
+      'Australia/Sydney',
+      'Pacific/Auckland'
+    ];
+
+    // Add user's current timezone if not in list
+    const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (!timezones.includes(userTz)) {
+      timezones.unshift(userTz);
+    }
+
+    return timezones;
   };
 
   if (loading) {
@@ -490,6 +592,22 @@ const Hackathons: React.FC = () => {
                 </div>
               </div>
 
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Timezone</label>
+                  <select
+                    value={formData.timezone || userTimezone}
+                    onChange={(e) => setFormData({...formData, timezone: e.target.value})}
+                  >
+                    {getTimezoneList().map((tz) => (
+                      <option key={tz} value={tz}>
+                        {tz.replace(/_/g, ' ')}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <div className="form-group">
                 <label>Devpost URL</label>
                 <input
@@ -570,12 +688,13 @@ const Hackathons: React.FC = () => {
                   <div className="deadline-info-container">
                     {(() => {
                       // Try to extract original deadline text from notes
-                      const deadlineTextLine = hackathon.notes?.split('\n').find(line => line.includes('Imported deadline:'));
-                      const originalText = deadlineTextLine?.replace('Imported deadline:', '').trim();
+                      const deadlineTextLine = hackathon.notes?.split('\n').find(line => line.includes('Original Deadline:'));
+                      const originalText = deadlineTextLine?.replace('Original Deadline:', '').trim();
                       
                       const { userTime, isEstimated } = formatDateWithTimezone(
                         hackathon.submissionDeadline, 
-                        originalText
+                        originalText,
+                        hackathon.timezone
                       );
                       const warning = getTimezoneWarning(hackathon.submissionDeadline);
                       
@@ -684,6 +803,19 @@ const Hackathons: React.FC = () => {
           </div>
         </div>
       )}
+
+      <TimezoneConfirmModal
+        isOpen={showTimezoneModal}
+        onClose={() => {
+          setShowTimezoneModal(false);
+          handleImportConfirm(importedData, false);
+        }}
+        onConfirm={() => handleImportConfirm(importedData, true)}
+        sourceTimezone={importedData?.timezone || 'Unknown'}
+        userTimezone={userTimezone}
+        dateExample={importedData?.deadlineText || ''}
+        convertedDateExample={convertedDates?.submissionDeadline || ''}
+      />
     </div>
   );
 };
