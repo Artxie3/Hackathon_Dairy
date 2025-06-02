@@ -294,15 +294,21 @@ const Hackathons: React.FC = () => {
     setImportError(null);
 
     try {
+      console.log('Starting import from:', importUrl);
       const scrapedData = await DevpostScraper.scrapeHackathon(importUrl);
+      console.log('Scraped data:', scrapedData);
       
       // If we have timezone info, show confirmation dialog
-      if (scrapedData.timezone) {
+      if (scrapedData.timezone && scrapedData.timezone.trim() !== '') {
+        console.log('Showing timezone confirmation for:', scrapedData.timezone);
         setPendingImportData(scrapedData);
         setShowTimezoneConfirm(true);
+        setIsImporting(false); // Stop loading spinner while waiting for user confirmation
       } else {
         // No timezone info, proceed normally
+        console.log('No timezone info found, proceeding with direct import');
         processImportData(scrapedData);
+        setIsImporting(false);
       }
       
     } catch (error) {
@@ -310,71 +316,112 @@ const Hackathons: React.FC = () => {
       
       // If scraping fails, try to extract basic info from URL
       try {
+        console.log('Trying fallback extraction from URL');
         const basicData = DevpostScraper.extractFromUrl(importUrl);
         processImportData(basicData);
         setImportError('Partial import successful - please verify and complete the details');
       } catch (fallbackError) {
+        console.error('Fallback extraction also failed:', fallbackError);
         setImportError(error instanceof Error ? error.message : 'Failed to import hackathon data');
       }
-    } finally {
       setIsImporting(false);
     }
   };
 
   const processImportData = (scrapedData: any) => {
-    // Convert dates to the format expected by datetime-local inputs
-    const formatDateForInput = (isoString: string) => {
-      const date = new Date(isoString);
-      return date.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
-    };
-
-    // Update form data with scraped information
-    setFormData({
-      ...formData,
-      title: scrapedData.title,
-      description: scrapedData.description,
-      startDate: formatDateForInput(scrapedData.startDate),
-      endDate: formatDateForInput(scrapedData.endDate),
-      submissionDeadline: formatDateForInput(scrapedData.submissionDeadline),
-      status: scrapedData.status,
-      devpostUrl: scrapedData.devpostUrl,
-      // Store timezone info in notes
-      notes: scrapedData.timezone 
-        ? `Imported deadline: ${scrapedData.deadlineText}\nSource timezone: ${scrapedData.timezone}\nUser timezone: ${userTimezone}`
-        : scrapedData.deadlineText || ''
-    });
-
-    setImportUrl(''); // Clear the import URL field
+    console.log('Processing import data:', scrapedData);
     
-    // Show success message with timezone info
-    if (scrapedData.timezone) {
-      console.log(`Successfully imported hackathon with timezone conversion: ${scrapedData.timezone} → ${userTimezone}`);
+    try {
+      // Convert dates to the format expected by datetime-local inputs
+      const formatDateForInput = (isoString: string) => {
+        if (!isoString) return '';
+        const date = new Date(isoString);
+        if (isNaN(date.getTime())) return '';
+        return date.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+      };
+
+      // Create notes with timezone info if available
+      let notes = '';
+      if (scrapedData.deadlineText) {
+        notes += `Imported deadline: ${scrapedData.deadlineText}`;
+      }
+      if (scrapedData.timezone) {
+        notes += `\nSource timezone: ${scrapedData.timezone}`;
+      }
+      if (userTimezone) {
+        notes += `\nUser timezone: ${userTimezone}`;
+      }
+
+      // Update form data with scraped information
+      const updatedFormData = {
+        ...formData,
+        title: scrapedData.title || '',
+        description: scrapedData.description || '',
+        startDate: formatDateForInput(scrapedData.startDate),
+        endDate: formatDateForInput(scrapedData.endDate),
+        submissionDeadline: formatDateForInput(scrapedData.submissionDeadline),
+        status: scrapedData.status || 'upcoming',
+        devpostUrl: scrapedData.devpostUrl || importUrl,
+        notes: notes.trim()
+      };
+
+      console.log('Updated form data:', updatedFormData);
+      setFormData(updatedFormData);
+
+      setImportUrl(''); // Clear the import URL field
+      
+      // Show success message
+      console.log('Successfully imported hackathon data');
+      if (scrapedData.timezone) {
+        console.log(`Timezone conversion: ${scrapedData.timezone} → ${userTimezone}`);
+      }
+      
+    } catch (error) {
+      console.error('Error processing import data:', error);
+      setImportError('Error processing imported data. Please check the details and try again.');
     }
   };
 
   const handleTimezoneConfirm = (confirmedUserTz: string) => {
-    if (!pendingImportData) return;
+    console.log('Timezone confirmed:', confirmedUserTz);
+    
+    if (!pendingImportData) {
+      console.error('No pending import data found');
+      setShowTimezoneConfirm(false);
+      return;
+    }
 
-    // Update user timezone if changed
-    setUserTimezone(confirmedUserTz);
+    try {
+      // Update user timezone if changed
+      setUserTimezone(confirmedUserTz);
 
-    // Convert the deadline from source timezone to user timezone
-    const sourceTimezone = mapTimezoneAbbreviation(pendingImportData.timezone);
-    const convertedDeadline = convertTimezone(
-      pendingImportData.submissionDeadline, 
-      sourceTimezone, 
-      confirmedUserTz
-    );
+      // Convert the deadline from source timezone to user timezone
+      const sourceTimezone = mapTimezoneAbbreviation(pendingImportData.timezone);
+      console.log('Converting from', pendingImportData.timezone, 'to', confirmedUserTz);
+      
+      const convertedDeadline = convertTimezone(
+        pendingImportData.submissionDeadline, 
+        sourceTimezone, 
+        confirmedUserTz
+      );
 
-    // Process the data with converted timezone
-    const processedData = {
-      ...pendingImportData,
-      submissionDeadline: convertedDeadline
-    };
+      // Process the data with converted timezone
+      const processedData = {
+        ...pendingImportData,
+        submissionDeadline: convertedDeadline
+      };
 
-    processImportData(processedData);
-    setShowTimezoneConfirm(false);
-    setPendingImportData(null);
+      console.log('Processed data with timezone conversion:', processedData);
+      processImportData(processedData);
+      
+    } catch (error) {
+      console.error('Error in timezone confirmation:', error);
+      // Fall back to processing without conversion
+      processImportData(pendingImportData);
+    } finally {
+      setShowTimezoneConfirm(false);
+      setPendingImportData(null);
+    }
   };
 
   const handleQuickImport = (url: string) => {
@@ -551,6 +598,27 @@ const Hackathons: React.FC = () => {
                         className="quick-import-btn"
                       >
                         Browse Devpost
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          console.log('Testing basic import functionality');
+                          const testData = {
+                            title: 'Test Hackathon',
+                            description: 'This is a test import',
+                            startDate: new Date().toISOString(),
+                            endDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+                            submissionDeadline: new Date(Date.now() + 23 * 60 * 60 * 1000).toISOString(),
+                            devpostUrl: 'https://test.devpost.com/',
+                            status: 'upcoming',
+                            deadlineText: 'Test deadline'
+                          };
+                          processImportData(testData);
+                        }}
+                        className="quick-import-btn"
+                        style={{ backgroundColor: '#10b981', color: 'white' }}
+                      >
+                        Test Import
                       </button>
                     </div>
                   </div>
