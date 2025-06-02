@@ -27,7 +27,6 @@ const Hackathons: React.FC = () => {
   const [userTimezone, setUserTimezone] = useState<string>('');
   const [formData, setFormData] = useState<Partial<Hackathon>>({
     title: '',
-    organizer: '',
     description: '',
     startDate: '',
     endDate: '',
@@ -81,7 +80,6 @@ const Hackathons: React.FC = () => {
   const resetForm = () => {
     setFormData({
       title: '',
-      organizer: '',
       description: '',
       startDate: '',
       endDate: '',
@@ -143,11 +141,11 @@ const Hackathons: React.FC = () => {
     return diffDays;
   };
 
-  const formatDateWithTimezone = (dateString: string, timezone?: string, originalText?: string) => {
+  const formatDateWithTimezone = (dateString: string, originalText?: string) => {
     const date = new Date(dateString);
-    const userTz = userTimezone || 'UTC';
+    const userTz = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
     
-    // Format in user's timezone
+    // Format in user's timezone with clear timezone display
     const userTime = new Intl.DateTimeFormat('en-US', {
       timeZone: userTz,
       month: 'short',
@@ -158,43 +156,20 @@ const Hackathons: React.FC = () => {
       timeZoneName: 'short'
     }).format(date);
 
-    // If we have original timezone info, also show that
-    let originalTime = '';
-    if (timezone) {
-      try {
-        // Try to parse the timezone and convert
-        let tzOffset = '';
-        if (timezone.includes('GMT')) {
-          tzOffset = timezone.replace('GMT', 'UTC');
-        } else {
-          tzOffset = timezone;
-        }
-        
-        originalTime = new Intl.DateTimeFormat('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        }).format(date) + ` (${timezone})`;
-      } catch (error) {
-        originalTime = originalText || '';
-      }
-    }
+    // Check if the deadline is estimated
+    const isEstimated = originalText?.includes('Estimated') || false;
 
-    return { userTime, originalTime, isEstimated: originalText?.includes('Estimated') };
+    return { userTime, isEstimated, originalText };
   };
 
-  const getTimezoneWarning = (dateString: string, timezone?: string) => {
-    if (!timezone) return null;
-    
+  const getTimezoneWarning = (dateString: string) => {
     const deadline = new Date(dateString);
     const now = new Date();
     const diffHours = (deadline.getTime() - now.getTime()) / (1000 * 60 * 60);
     
-    if (diffHours < 24) {
+    if (diffHours < 24 && diffHours > 0) {
       return 'urgent';
-    } else if (diffHours < 72) {
+    } else if (diffHours < 72 && diffHours > 0) {
       return 'warning';
     }
     return null;
@@ -227,7 +202,6 @@ const Hackathons: React.FC = () => {
       setFormData({
         ...formData,
         title: scrapedData.title,
-        organizer: scrapedData.organizer,
         description: scrapedData.description,
         startDate: formatDateForInput(scrapedData.startDate),
         endDate: formatDateForInput(scrapedData.endDate),
@@ -452,24 +426,14 @@ const Hackathons: React.FC = () => {
             )}
 
             <form onSubmit={handleSubmit} className="hackathon-form">
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Title *</label>
-                  <input
-                    type="text"
-                    value={formData.title || ''}
-                    onChange={(e) => setFormData({...formData, title: e.target.value})}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Organizer</label>
-                  <input
-                    type="text"
-                    value={formData.organizer || ''}
-                    onChange={(e) => setFormData({...formData, organizer: e.target.value})}
-                  />
-                </div>
+              <div className="form-group">
+                <label>Title *</label>
+                <input
+                  type="text"
+                  value={formData.title || ''}
+                  onChange={(e) => setFormData({...formData, title: e.target.value})}
+                  required
+                />
               </div>
 
               <div className="form-group">
@@ -556,7 +520,6 @@ const Hackathons: React.FC = () => {
             <div className="hackathon-header">
               <div>
                 <h3 className="hackathon-title">{hackathon.title}</h3>
-                <p className="hackathon-organizer">{hackathon.organizer}</p>
               </div>
               
               {/* Action Buttons */}
@@ -606,18 +569,15 @@ const Hackathons: React.FC = () => {
                   <Clock size={14} />
                   <div className="deadline-info-container">
                     {(() => {
-                      // Try to extract timezone from notes if stored there
-                      const timezoneLine = hackathon.notes?.split('\n').find(line => line.includes('Timezone:'));
-                      const originalTimezone = timezoneLine?.replace('Timezone:', '').trim();
+                      // Try to extract original deadline text from notes
                       const deadlineTextLine = hackathon.notes?.split('\n').find(line => line.includes('Imported deadline:'));
                       const originalText = deadlineTextLine?.replace('Imported deadline:', '').trim();
                       
-                      const { userTime, originalTime, isEstimated } = formatDateWithTimezone(
+                      const { userTime, isEstimated } = formatDateWithTimezone(
                         hackathon.submissionDeadline, 
-                        originalTimezone,
                         originalText
                       );
-                      const warning = getTimezoneWarning(hackathon.submissionDeadline, originalTimezone);
+                      const warning = getTimezoneWarning(hackathon.submissionDeadline);
                       
                       return (
                         <>
@@ -631,10 +591,10 @@ const Hackathons: React.FC = () => {
                             )}
                           </div>
                           
-                          {originalTime && originalTime !== userTime && (
+                          {originalText && !isEstimated && (
                             <div className="deadline-original">
                               <Globe size={12} />
-                              <span>Original: {originalTime}</span>
+                              <span>Source: {originalText}</span>
                             </div>
                           )}
                           

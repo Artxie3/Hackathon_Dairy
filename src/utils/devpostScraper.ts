@@ -1,6 +1,5 @@
 interface DevpostHackathonData {
   title: string;
-  organizer: string;
   description: string;
   startDate: string;
   endDate: string;
@@ -80,9 +79,6 @@ export class DevpostScraper {
     // Extract title
     const title = this.extractTitle(doc);
     
-    // Extract organizer
-    const organizer = this.extractOrganizer(doc);
-    
     // Extract description
     const description = this.extractDescription(doc);
     
@@ -100,7 +96,6 @@ export class DevpostScraper {
 
     return {
       title,
-      organizer,
       description,
       startDate: dates.startDate,
       endDate: dates.endDate,
@@ -128,6 +123,12 @@ export class DevpostScraper {
         let title = element.textContent.trim();
         // Clean up title (remove "| Devpost" suffix if present)
         title = title.replace(/\s*\|\s*Devpost\s*$/, '');
+        
+        // Take only the part before ":" if it exists
+        if (title.includes(':')) {
+          title = title.split(':')[0].trim();
+        }
+        
         if (title.length > 10) { // Reasonable title length
           return title;
         }
@@ -135,39 +136,6 @@ export class DevpostScraper {
     }
 
     return 'Untitled Hackathon';
-  }
-
-  private static extractOrganizer(doc: Document): string {
-    // Try to find organizer information
-    const organizerSelectors = [
-      '[data-testid="organizer"]',
-      '.organizer',
-      '.hackathon-organizer',
-      '.sponsor',
-      '.presented-by'
-    ];
-
-    for (const selector of organizerSelectors) {
-      const element = doc.querySelector(selector);
-      if (element?.textContent?.trim()) {
-        return element.textContent.trim();
-      }
-    }
-
-    // Try to extract from title (e.g., "Hackathon presented by Company")
-    const title = doc.querySelector('h1')?.textContent || '';
-    const presentedByMatch = title.match(/presented by (.+?)$/i);
-    if (presentedByMatch) {
-      return presentedByMatch[1].trim();
-    }
-
-    // Look for sponsor information
-    const sponsorElement = doc.querySelector('[class*="sponsor"], [class*="partner"]');
-    if (sponsorElement?.textContent?.trim()) {
-      return sponsorElement.textContent.trim();
-    }
-
-    return 'Unknown Organizer';
   }
 
   private static extractDescription(doc: Document): string {
@@ -342,17 +310,17 @@ export class DevpostScraper {
     // Clean up the text
     const cleaned = text.replace(/^\s*[^\w]*/, '').replace(/[^\w\s:@+-]*$/, '');
     
-    // Extract timezone information
+    // Extract timezone information (for reference only)
     let timezone = undefined;
-    const timezoneMatch = cleaned.match(/(GMT[+-]\d{1,2}|UTC[+-]\d{1,2}|[A-Z]{3,4}(?:[+-]\d{1,2})?)/i);
+    const timezoneMatch = cleaned.match(/(GMT[+-]\d{1,2}|UTC[+-]\d{1,2}|PDT|PST|EST|EDT|CST|CDT|MST|MDT|[A-Z]{3,4})/i);
     if (timezoneMatch) {
       timezone = timezoneMatch[1];
     }
 
     // Try various date/time patterns
     const patterns = [
-      // "Jun 30, 2025 @ 4:00pm GMT-5" format
-      /([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{4})\s*@?\s*(\d{1,2}):(\d{2})\s*([ap]m)?\s*(GMT[+-]\d{1,2}|UTC[+-]\d{1,2}|[A-Z]{3,4})?/i,
+      // "Jun 30, 2025 @ 4:00pm GMT-5" or "Jun 30, 2025 @ 4:00pm PDT" format
+      /([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{4})\s*@?\s*(\d{1,2}):(\d{2})\s*([ap]m)?\s*([A-Z]{3,4}|GMT[+-]\d{1,2}|UTC[+-]\d{1,2})?/i,
       
       // "June 30, 2025 at 4:00 PM" format
       /([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{4})\s+(?:at|@)\s+(\d{1,2}):(\d{2})\s*([ap]m)?/i,
@@ -378,22 +346,30 @@ export class DevpostScraper {
             const [, month, day, year, hour, minute, ampm, tz] = match;
             if (tz) timezone = tz;
             
+            const monthNum = this.getMonthNumber(month);
+            const dayPadded = day.padStart(2, '0');
+            
             if (hour && minute) {
               const hour24 = this.convertTo24Hour(hour, ampm);
-              dateStr = `${month} ${day}, ${year} ${hour24}:${minute}:00`;
+              // Create ISO format date string - browser will handle timezone
+              dateStr = `${year}-${monthNum}-${dayPadded}T${hour24}:${minute}:00`;
             } else {
-              dateStr = `${month} ${day}, ${year} 23:59:59`; // End of day if no time specified
+              // Date only - set to end of day
+              dateStr = `${year}-${monthNum}-${dayPadded}T23:59:59`;
             }
           } else if (pattern.source.includes('(\\d{4})-(\\d{2})-(\\d{2})')) {
-            // ISO format
+            // ISO format - use as is
             const [, year, month, day, hour, minute, second] = match;
             dateStr = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
           } else if (pattern.source.includes('(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})')) {
             // MM/DD/YYYY format
             const [, month, day, year] = match;
-            dateStr = `${month}/${day}/${year} 23:59:59`;
+            const monthPadded = month.padStart(2, '0');
+            const dayPadded = day.padStart(2, '0');
+            dateStr = `${year}-${monthPadded}-${dayPadded}T23:59:59`;
           }
           
+          // Create the date object
           const date = new Date(dateStr);
           if (!isNaN(date.getTime())) {
             return { 
@@ -408,6 +384,25 @@ export class DevpostScraper {
     }
     
     return { deadline: null };
+  }
+
+  private static getMonthNumber(monthStr: string): string {
+    const month = monthStr.toLowerCase().substring(0, 3);
+    const monthMap: { [key: string]: string } = {
+      'jan': '01',
+      'feb': '02', 
+      'mar': '03',
+      'apr': '04',
+      'may': '05',
+      'jun': '06',
+      'jul': '07',
+      'aug': '08',
+      'sep': '09',
+      'oct': '10',
+      'nov': '11',
+      'dec': '12'
+    };
+    return monthMap[month] || '01';
   }
 
   private static convertTo24Hour(hour: string, ampm?: string): string {
@@ -546,7 +541,6 @@ export class DevpostScraper {
 
     return {
       title,
-      organizer: 'Unknown Organizer',
       description: 'Imported from Devpost - Details unavailable. Please update manually.',
       startDate,
       endDate,
