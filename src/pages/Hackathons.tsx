@@ -163,9 +163,23 @@ const Hackathons: React.FC = () => {
   const convertTimezone = (dateString: string, fromTz: string, toTz: string) => {
     const date = new Date(dateString);
     
+    // Validate timezone - fallback to UTC if invalid
+    let validToTz = toTz;
+    if (!toTz || toTz.trim() === '') {
+      validToTz = 'UTC';
+    }
+    
+    try {
+      // Test if timezone is valid by creating a DateTimeFormat
+      new Intl.DateTimeFormat('en', { timeZone: validToTz });
+    } catch (error) {
+      console.warn(`Invalid timezone: ${validToTz}, falling back to UTC`);
+      validToTz = 'UTC';
+    }
+    
     // Format in target timezone
     const converted = new Intl.DateTimeFormat('en-US', {
-      timeZone: toTz,
+      timeZone: validToTz,
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -178,6 +192,10 @@ const Hackathons: React.FC = () => {
   };
 
   const parseTimezoneFromText = (timezone: string): string => {
+    if (!timezone || timezone.trim() === '') {
+      return 'UTC';
+    }
+    
     // Map common timezone abbreviations to IANA timezone names
     const timezoneMap: { [key: string]: string } = {
       'PDT': 'America/Los_Angeles',
@@ -215,16 +233,26 @@ const Hackathons: React.FC = () => {
 
   const formatDateWithTimezone = (dateString: string, sourceTimezone?: string, originalText?: string) => {
     const date = new Date(dateString);
-    const userTz = selectedTimezone || userTimezone;
+    let userTz = selectedTimezone || userTimezone;
+    
+    // Validate user timezone
+    if (!userTz || userTz.trim() === '') {
+      userTz = 'UTC';
+    }
     
     // Format in user's timezone
     const userTime = convertTimezone(dateString, 'UTC', userTz);
     
     // Format source time if we have timezone info
     let sourceTime = '';
-    if (sourceTimezone) {
-      const sourceTz = parseTimezoneFromText(sourceTimezone);
-      sourceTime = convertTimezone(dateString, 'UTC', sourceTz);
+    if (sourceTimezone && sourceTimezone.trim() !== '') {
+      try {
+        const sourceTz = parseTimezoneFromText(sourceTimezone);
+        sourceTime = convertTimezone(dateString, 'UTC', sourceTz);
+      } catch (error) {
+        console.warn('Error formatting source timezone:', error);
+        sourceTime = '';
+      }
     }
 
     // Check if the deadline is estimated
@@ -234,16 +262,21 @@ const Hackathons: React.FC = () => {
   };
 
   const getTimezoneWarning = (dateString: string) => {
-    const deadline = new Date(dateString);
-    const now = new Date();
-    const diffHours = (deadline.getTime() - now.getTime()) / (1000 * 60 * 60);
-    
-    if (diffHours < 24 && diffHours > 0) {
-      return 'urgent';
-    } else if (diffHours < 72 && diffHours > 0) {
-      return 'warning';
+    try {
+      const deadline = new Date(dateString);
+      const now = new Date();
+      const diffHours = (deadline.getTime() - now.getTime()) / (1000 * 60 * 60);
+      
+      if (diffHours < 24 && diffHours > 0) {
+        return 'urgent';
+      } else if (diffHours < 72 && diffHours > 0) {
+        return 'warning';
+      }
+      return null;
+    } catch (error) {
+      console.warn('Error calculating timezone warning:', error);
+      return null;
     }
-    return null;
   };
 
   const handleImportFromDevpost = async () => {
@@ -815,7 +848,14 @@ const Hackathons: React.FC = () => {
                   Source: {importedData.deadlineText}
                 </div>
                 <div className="text-gray-900 dark:text-gray-100 font-medium">
-                  Your time: {convertTimezone(importedData.submissionDeadline, 'UTC', selectedTimezone)}
+                  Your time: {(() => {
+                    try {
+                      return convertTimezone(importedData.submissionDeadline, 'UTC', selectedTimezone);
+                    } catch (error) {
+                      console.warn('Error in timezone preview:', error);
+                      return 'Unable to convert timezone';
+                    }
+                  })()}
                 </div>
               </div>
             </div>
