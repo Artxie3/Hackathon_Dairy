@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Calendar, Clock, Trophy, ExternalLink, Edit, Trash2, Users, Code, AlertCircle, Download, Loader, Globe, MapPin } from 'lucide-react';
+import { Plus, Calendar, Clock, Trophy, ExternalLink, Edit, Trash2, Users, Code, AlertCircle, Download, Loader, Globe } from 'lucide-react';
 import { useHackathons, Hackathon } from '../contexts/HackathonContext';
 import { DevpostScraper } from '../utils/devpostScraper';
 import '../styles/Hackathons.css';
@@ -25,8 +25,6 @@ const Hackathons: React.FC = () => {
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [userTimezone, setUserTimezone] = useState<string>('');
-  const [showTimezoneConfirm, setShowTimezoneConfirm] = useState(false);
-  const [pendingImportData, setPendingImportData] = useState<any>(null);
   const [formData, setFormData] = useState<Partial<Hackathon>>({
     title: '',
     description: '',
@@ -51,100 +49,6 @@ const Hackathons: React.FC = () => {
     // Get user's timezone
     setUserTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
   }, []);
-
-  // Timezone conversion utilities
-  const convertTimezone = (isoString: string, fromTz: string, toTz: string) => {
-    try {
-      const date = new Date(isoString);
-      
-      // Validate timezones
-      if (!toTz || toTz.trim() === '') {
-        toTz = 'UTC';
-      }
-      
-      // Format in target timezone
-      const converted = new Intl.DateTimeFormat('en-US', {
-        timeZone: toTz,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-      }).formatToParts(date);
-
-      const parts = converted.reduce((acc, part) => {
-        acc[part.type] = part.value;
-        return acc;
-      }, {} as any);
-
-      return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
-    } catch (error) {
-      console.warn('Timezone conversion failed, returning original:', error);
-      return isoString;
-    }
-  };
-
-  const formatTimeWithTimezone = (isoString: string, timezone: string, label: string) => {
-    const date = new Date(isoString);
-    
-    // Validate timezone before using it
-    if (!timezone || timezone.trim() === '') {
-      timezone = 'UTC';
-    }
-    
-    try {
-      return new Intl.DateTimeFormat('en-US', {
-        timeZone: timezone,
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZoneName: 'short'
-      }).format(date);
-    } catch (error) {
-      // Fallback to UTC if timezone is invalid
-      return new Intl.DateTimeFormat('en-US', {
-        timeZone: 'UTC',
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZoneName: 'short'
-      }).format(date);
-    }
-  };
-
-  const mapTimezoneAbbreviation = (tzAbbr: string): string => {
-    if (!tzAbbr || tzAbbr.trim() === '') {
-      return 'UTC';
-    }
-    
-    const timezoneMap: { [key: string]: string } = {
-      'PDT': 'America/Los_Angeles',
-      'PST': 'America/Los_Angeles',
-      'EDT': 'America/New_York',
-      'EST': 'America/New_York',
-      'CDT': 'America/Chicago',
-      'CST': 'America/Chicago',
-      'MDT': 'America/Denver',
-      'MST': 'America/Denver',
-      'GMT-5': 'America/New_York',
-      'GMT-4': 'America/New_York',
-      'GMT-6': 'America/Chicago',
-      'GMT-7': 'America/Denver',
-      'GMT-8': 'America/Los_Angeles',
-      'UTC-5': 'America/New_York',
-      'UTC-4': 'America/New_York',
-      'UTC-6': 'America/Chicago',
-      'UTC-7': 'America/Denver',
-      'UTC-8': 'America/Los_Angeles',
-    };
-    return timezoneMap[tzAbbr.trim()] || 'UTC';
-  };
 
   const getFilteredHackathons = () => {
     switch (activeTab) {
@@ -239,31 +143,23 @@ const Hackathons: React.FC = () => {
 
   const formatDateWithTimezone = (dateString: string, originalText?: string) => {
     const date = new Date(dateString);
+    const userTz = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
     
-    // Extract timezone info from notes - but handle when there are no notes
-    const notes = formData.notes || '';
-    const sourceTimezoneMatch = notes.match(/Source timezone: ([^\n]+)/);
-    const sourceTimezone = sourceTimezoneMatch ? sourceTimezoneMatch[1].trim() : null;
-    
-    // Ensure userTimezone is valid
-    const validUserTimezone = userTimezone && userTimezone.trim() !== '' 
-      ? userTimezone 
-      : Intl.DateTimeFormat().resolvedOptions().timeZone;
-    
-    // Format in user's timezone
-    const userTime = formatTimeWithTimezone(dateString, validUserTimezone, 'User');
-    
-    // Format in source timezone if available and valid
-    let sourceTime = null;
-    if (sourceTimezone && sourceTimezone.trim() !== '') {
-      const sourceTzName = mapTimezoneAbbreviation(sourceTimezone);
-      sourceTime = formatTimeWithTimezone(dateString, sourceTzName, 'Source');
-    }
+    // Format in user's timezone with clear timezone display
+    const userTime = new Intl.DateTimeFormat('en-US', {
+      timeZone: userTz,
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZoneName: 'short'
+    }).format(date);
 
     // Check if the deadline is estimated
     const isEstimated = originalText?.includes('Estimated') || false;
 
-    return { userTime, sourceTime, isEstimated, originalText, sourceTimezone };
+    return { userTime, isEstimated, originalText };
   };
 
   const getTimezoneWarning = (dateString: string) => {
@@ -294,21 +190,35 @@ const Hackathons: React.FC = () => {
     setImportError(null);
 
     try {
-      console.log('Starting import from:', importUrl);
       const scrapedData = await DevpostScraper.scrapeHackathon(importUrl);
-      console.log('Scraped data:', scrapedData);
       
-      // If we have timezone info, show confirmation dialog
-      if (scrapedData.timezone && scrapedData.timezone.trim() !== '') {
-        console.log('Showing timezone confirmation for:', scrapedData.timezone);
-        setPendingImportData(scrapedData);
-        setShowTimezoneConfirm(true);
-        setIsImporting(false); // Stop loading spinner while waiting for user confirmation
-      } else {
-        // No timezone info, proceed normally
-        console.log('No timezone info found, proceeding with direct import');
-        processImportData(scrapedData);
-        setIsImporting(false);
+      // Convert dates to the format expected by datetime-local inputs
+      const formatDateForInput = (isoString: string) => {
+        const date = new Date(isoString);
+        return date.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+      };
+
+      // Update form data with scraped information
+      setFormData({
+        ...formData,
+        title: scrapedData.title,
+        description: scrapedData.description,
+        startDate: formatDateForInput(scrapedData.startDate),
+        endDate: formatDateForInput(scrapedData.endDate),
+        submissionDeadline: formatDateForInput(scrapedData.submissionDeadline),
+        status: scrapedData.status,
+        devpostUrl: scrapedData.devpostUrl,
+        // Store timezone info in notes for now
+        notes: scrapedData.timezone 
+          ? `Imported deadline: ${scrapedData.deadlineText}\nTimezone: ${scrapedData.timezone}`
+          : scrapedData.deadlineText || ''
+      });
+
+      setImportUrl(''); // Clear the import URL field
+      
+      // Show success message with timezone info
+      if (scrapedData.timezone) {
+        console.log(`Successfully imported hackathon with timezone: ${scrapedData.timezone}`);
       }
       
     } catch (error) {
@@ -316,111 +226,17 @@ const Hackathons: React.FC = () => {
       
       // If scraping fails, try to extract basic info from URL
       try {
-        console.log('Trying fallback extraction from URL');
         const basicData = DevpostScraper.extractFromUrl(importUrl);
-        processImportData(basicData);
+        setFormData({
+          ...formData,
+          ...basicData,
+        });
         setImportError('Partial import successful - please verify and complete the details');
       } catch (fallbackError) {
-        console.error('Fallback extraction also failed:', fallbackError);
         setImportError(error instanceof Error ? error.message : 'Failed to import hackathon data');
       }
-      setIsImporting(false);
-    }
-  };
-
-  const processImportData = (scrapedData: any) => {
-    console.log('Processing import data:', scrapedData);
-    
-    try {
-      // Convert dates to the format expected by datetime-local inputs
-      const formatDateForInput = (isoString: string) => {
-        if (!isoString) return '';
-        const date = new Date(isoString);
-        if (isNaN(date.getTime())) return '';
-        return date.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
-      };
-
-      // Create notes with timezone info if available
-      let notes = '';
-      if (scrapedData.deadlineText) {
-        notes += `Imported deadline: ${scrapedData.deadlineText}`;
-      }
-      if (scrapedData.timezone) {
-        notes += `\nSource timezone: ${scrapedData.timezone}`;
-      }
-      if (userTimezone) {
-        notes += `\nUser timezone: ${userTimezone}`;
-      }
-
-      // Update form data with scraped information
-      const updatedFormData = {
-        ...formData,
-        title: scrapedData.title || '',
-        description: scrapedData.description || '',
-        startDate: formatDateForInput(scrapedData.startDate),
-        endDate: formatDateForInput(scrapedData.endDate),
-        submissionDeadline: formatDateForInput(scrapedData.submissionDeadline),
-        status: scrapedData.status || 'upcoming',
-        devpostUrl: scrapedData.devpostUrl || importUrl,
-        notes: notes.trim()
-      };
-
-      console.log('Updated form data:', updatedFormData);
-      setFormData(updatedFormData);
-
-      setImportUrl(''); // Clear the import URL field
-      
-      // Show success message
-      console.log('Successfully imported hackathon data');
-      if (scrapedData.timezone) {
-        console.log(`Timezone conversion: ${scrapedData.timezone} → ${userTimezone}`);
-      }
-      
-    } catch (error) {
-      console.error('Error processing import data:', error);
-      setImportError('Error processing imported data. Please check the details and try again.');
-    }
-  };
-
-  const handleTimezoneConfirm = (confirmedUserTz: string) => {
-    console.log('Timezone confirmed:', confirmedUserTz);
-    
-    if (!pendingImportData) {
-      console.error('No pending import data found');
-      setShowTimezoneConfirm(false);
-      return;
-    }
-
-    try {
-      // Update user timezone if changed
-      setUserTimezone(confirmedUserTz);
-
-      // Convert the deadline from source timezone to user timezone
-      const sourceTimezone = mapTimezoneAbbreviation(pendingImportData.timezone);
-      console.log('Converting from', pendingImportData.timezone, 'to', confirmedUserTz);
-      
-      const convertedDeadline = convertTimezone(
-        pendingImportData.submissionDeadline, 
-        sourceTimezone, 
-        confirmedUserTz
-      );
-
-      // Process the data with converted timezone
-      const processedData = {
-        ...pendingImportData,
-        submissionDeadline: convertedDeadline
-      };
-
-      console.log('Processed data with timezone conversion:', processedData);
-      processImportData(processedData);
-      
-    } catch (error) {
-      console.error('Error in timezone confirmation:', error);
-      // Fall back to processing without conversion
-      processImportData(pendingImportData);
     } finally {
-      setShowTimezoneConfirm(false);
-      setPendingImportData(null);
+      setIsImporting(false);
     }
   };
 
@@ -599,27 +415,6 @@ const Hackathons: React.FC = () => {
                       >
                         Browse Devpost
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          console.log('Testing basic import functionality');
-                          const testData = {
-                            title: 'Test Hackathon',
-                            description: 'This is a test import',
-                            startDate: new Date().toISOString(),
-                            endDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-                            submissionDeadline: new Date(Date.now() + 23 * 60 * 60 * 1000).toISOString(),
-                            devpostUrl: 'https://test.devpost.com/',
-                            status: 'upcoming',
-                            deadlineText: 'Test deadline'
-                          };
-                          processImportData(testData);
-                        }}
-                        className="quick-import-btn"
-                        style={{ backgroundColor: '#10b981', color: 'white' }}
-                      >
-                        Test Import
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -778,26 +573,10 @@ const Hackathons: React.FC = () => {
                       const deadlineTextLine = hackathon.notes?.split('\n').find(line => line.includes('Imported deadline:'));
                       const originalText = deadlineTextLine?.replace('Imported deadline:', '').trim();
                       
-                      // Use hackathon notes instead of formData.notes for display
-                      const hackathonNotes = hackathon.notes || '';
-                      const sourceTimezoneMatch = hackathonNotes.match(/Source timezone: ([^\n]+)/);
-                      const sourceTimezone = sourceTimezoneMatch ? sourceTimezoneMatch[1].trim() : null;
-                      
-                      // Ensure userTimezone is valid
-                      const validUserTimezone = userTimezone && userTimezone.trim() !== '' 
-                        ? userTimezone 
-                        : Intl.DateTimeFormat().resolvedOptions().timeZone;
-                      
-                      // Format times safely
-                      const userTime = formatTimeWithTimezone(hackathon.submissionDeadline, validUserTimezone, 'User');
-                      
-                      let sourceTime = null;
-                      if (sourceTimezone && sourceTimezone.trim() !== '') {
-                        const sourceTzName = mapTimezoneAbbreviation(sourceTimezone);
-                        sourceTime = formatTimeWithTimezone(hackathon.submissionDeadline, sourceTzName, 'Source');
-                      }
-                      
-                      const isEstimated = originalText?.includes('Estimated') || false;
+                      const { userTime, isEstimated } = formatDateWithTimezone(
+                        hackathon.submissionDeadline, 
+                        originalText
+                      );
                       const warning = getTimezoneWarning(hackathon.submissionDeadline);
                       
                       return (
@@ -812,10 +591,10 @@ const Hackathons: React.FC = () => {
                             )}
                           </div>
                           
-                          {sourceTime && sourceTime !== userTime && (
+                          {originalText && !isEstimated && (
                             <div className="deadline-original">
                               <Globe size={12} />
-                              <span>Source: {sourceTime}</span>
+                              <span>Source: {originalText}</span>
                             </div>
                           )}
                           
@@ -875,78 +654,6 @@ const Hackathons: React.FC = () => {
               Add Your First Hackathon
             </button>
           )}
-        </div>
-      )}
-
-      {/* Timezone Confirmation Modal */}
-      {showTimezoneConfirm && pendingImportData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-              <MapPin size={20} />
-              Confirm Your Timezone
-            </h3>
-            
-            <div className="mb-4">
-              <p className="text-gray-600 dark:text-gray-300 mb-3">
-                We found a deadline with timezone <strong>{pendingImportData.timezone}</strong>. 
-                Please confirm your timezone for accurate conversion:
-              </p>
-              
-              <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg mb-4">
-                <div className="text-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Globe size={14} />
-                    <span className="font-medium">Source:</span>
-                    <span>{pendingImportData.deadlineText}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <MapPin size={14} />
-                    <span className="font-medium">Your timezone:</span>
-                    <span>{userTimezone}</span>
-                  </div>
-                </div>
-              </div>
-              
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Select your timezone:
-              </label>
-              <select
-                value={userTimezone}
-                onChange={(e) => setUserTimezone(e.target.value)}
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-              >
-                <option value="America/New_York">Eastern Time (EST/EDT)</option>
-                <option value="America/Chicago">Central Time (CST/CDT)</option>
-                <option value="America/Denver">Mountain Time (MST/MDT)</option>
-                <option value="America/Los_Angeles">Pacific Time (PST/PDT)</option>
-                <option value="UTC">UTC</option>
-                <option value="Europe/London">London (GMT/BST)</option>
-                <option value="Europe/Paris">Paris (CET/CEST)</option>
-                <option value="Asia/Tokyo">Tokyo (JST)</option>
-                <option value="Asia/Shanghai">Shanghai (CST)</option>
-                <option value="Australia/Sydney">Sydney (AEST/AEDT)</option>
-              </select>
-            </div>
-            
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setShowTimezoneConfirm(false);
-                  setPendingImportData(null);
-                }}
-                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleTimezoneConfirm(userTimezone)}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-              >
-                Confirm & Import
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
