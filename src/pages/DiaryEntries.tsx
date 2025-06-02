@@ -284,7 +284,7 @@ const DiaryEntries: React.FC = () => {
       )}
 
       {/* Entries Grid */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
         {/* Temporary Drafts */}
         {filteredTemporaryDrafts.map(draft => (
           <div

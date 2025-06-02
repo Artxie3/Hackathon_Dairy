@@ -1,5 +1,5 @@
 .sidebar {
-  width: 240px;
+  width: 260px;
   height: 100vh;
   background-color: var(--color-gray-900);
   color: var(--color-gray-100);
@@ -16,7 +16,7 @@
 }
 
 .sidebar-header {
-  padding: 1.5rem;
+  padding: 1.5rem 1.2rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -27,11 +27,12 @@
   color: var(--color-primary-light);
   font-weight: 600;
   font-size: 1.25rem;
+  min-width: 0;
 }
 
 .logo span {
   white-space: nowrap;
-  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .sidebar-nav {
