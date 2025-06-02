@@ -156,9 +156,25 @@ const Hackathons: React.FC = () => {
     const date = new Date(dateStr);
     const userTz = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
     
+    // Map common timezone abbreviations to IANA identifiers
+    const timezoneMap: { [key: string]: string } = {
+      'PDT': 'America/Los_Angeles',
+      'PST': 'America/Los_Angeles', 
+      'EDT': 'America/New_York',
+      'EST': 'America/New_York',
+      'CDT': 'America/Chicago',
+      'CST': 'America/Chicago',
+      'MDT': 'America/Denver',
+      'MST': 'America/Denver',
+      'GMT': 'UTC',
+      'UTC': 'UTC'
+    };
+    
+    const userIANA = timezoneMap[userTz] || userTz;
+    
     // Format the date in user's timezone
     return new Intl.DateTimeFormat('en-US', {
-      timeZone: userTz,
+      timeZone: userIANA,
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -178,19 +194,55 @@ const Hackathons: React.FC = () => {
       return date.toISOString();
     }
     
-    // Get the offset difference between timezones at this specific date
-    const sourceDate = new Date(date.toLocaleString("sv-SE", { timeZone: sourceTimezone }));
-    const targetDate = new Date(date.toLocaleString("sv-SE", { timeZone: targetTimezone }));
-    const utcDate = new Date(date.toLocaleString("sv-SE", { timeZone: "UTC" }));
+    // Map common timezone abbreviations to IANA identifiers
+    const timezoneMap: { [key: string]: string } = {
+      'PDT': 'America/Los_Angeles',
+      'PST': 'America/Los_Angeles', 
+      'EDT': 'America/New_York',
+      'EST': 'America/New_York',
+      'CDT': 'America/Chicago',
+      'CST': 'America/Chicago',
+      'MDT': 'America/Denver',
+      'MST': 'America/Denver',
+      'GMT': 'UTC',
+      'UTC': 'UTC'
+    };
     
-    // Calculate the time difference
-    const sourceOffset = utcDate.getTime() - sourceDate.getTime();
-    const targetOffset = utcDate.getTime() - targetDate.getTime();
-    const adjustment = sourceOffset - targetOffset;
+    // Convert abbreviations to IANA identifiers
+    const sourceIANA = timezoneMap[sourceTimezone] || sourceTimezone;
+    const targetIANA = timezoneMap[targetTimezone] || targetTimezone;
     
-    // Apply the adjustment
-    const adjustedDate = new Date(date.getTime() + adjustment);
-    return adjustedDate.toISOString();
+    try {
+      // Get the offset difference between timezones at this specific date
+      const sourceDate = new Date(date.toLocaleString("sv-SE", { timeZone: sourceIANA }));
+      const targetDate = new Date(date.toLocaleString("sv-SE", { timeZone: targetIANA }));
+      const utcDate = new Date(date.toLocaleString("sv-SE", { timeZone: "UTC" }));
+      
+      // Calculate the time difference
+      const sourceOffset = utcDate.getTime() - sourceDate.getTime();
+      const targetOffset = utcDate.getTime() - targetDate.getTime();
+      const adjustment = sourceOffset - targetOffset;
+      
+      // Apply the adjustment
+      const adjustedDate = new Date(date.getTime() + adjustment);
+      return adjustedDate.toISOString();
+    } catch (error) {
+      console.warn('Timezone conversion failed:', error);
+      // Fallback: return original date
+      return date.toISOString();
+    }
+  };
+
+  const formatDateForInput = (dateStr: string) => {
+    const date = new Date(dateStr);
+    // Format to YYYY-MM-DDTHH:mm (remove seconds and timezone)
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
   const handleImportFromDevpost = async () => {
@@ -213,28 +265,34 @@ const Hackathons: React.FC = () => {
 
       if (scrapedData.timezone && scrapedData.timezone !== userTimezone) {
         // Convert dates to user timezone for preview
-        const convertedDates = {
-          startDate: convertDateToTargetTimezone(scrapedData.startDate, scrapedData.timezone, userTimezone),
-          endDate: convertDateToTargetTimezone(scrapedData.endDate, scrapedData.timezone, userTimezone),
-          submissionDeadline: convertDateToTargetTimezone(scrapedData.submissionDeadline, scrapedData.timezone, userTimezone)
-        };
-        
-        // Format the converted deadline for display in modal
-        const convertedDeadlineFormatted = new Intl.DateTimeFormat('en-US', {
-          timeZone: userTimezone,
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          timeZoneName: 'short'
-        }).format(new Date(convertedDates.submissionDeadline));
-        
-        setConvertedDates({
-          ...convertedDates,
-          submissionDeadline: convertedDeadlineFormatted
-        });
-        setShowTimezoneModal(true);
+        try {
+          const convertedDates = {
+            startDate: convertDateToTargetTimezone(scrapedData.startDate, scrapedData.timezone, userTimezone),
+            endDate: convertDateToTargetTimezone(scrapedData.endDate, scrapedData.timezone, userTimezone),
+            submissionDeadline: convertDateToTargetTimezone(scrapedData.submissionDeadline, scrapedData.timezone, userTimezone)
+          };
+          
+          // Format the converted deadline for display in modal
+          const convertedDeadlineFormatted = new Intl.DateTimeFormat('en-US', {
+            timeZone: userTimezone,
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZoneName: 'short'
+          }).format(new Date(convertedDates.submissionDeadline));
+          
+          setConvertedDates({
+            ...convertedDates,
+            submissionDeadline: convertedDeadlineFormatted
+          });
+          setShowTimezoneModal(true);
+        } catch (conversionError) {
+          console.warn('Timezone conversion failed, proceeding without conversion:', conversionError);
+          // If conversion fails, proceed without showing the modal
+          handleImportConfirm(scrapedData);
+        }
       } else {
         // If timezones match or source timezone is unknown, proceed with import
         handleImportConfirm(scrapedData);
@@ -250,11 +308,6 @@ const Hackathons: React.FC = () => {
   };
 
   const handleImportConfirm = (data: any, shouldConvert = false) => {
-    const formatDateForInput = (dateStr: string) => {
-      const date = new Date(dateStr);
-      return date.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
-    };
-
     let dates = {
       startDate: data.startDate,
       endDate: data.endDate,
