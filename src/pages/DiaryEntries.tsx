@@ -236,46 +236,6 @@ const DiaryEntries: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats Overview */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-icon total">
-            <BookOpen size={20} />
-          </div>
-          <div>
-            <p className="stat-label">Total Entries</p>
-            <p className="stat-value">{entries.length}</p>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon recent">
-            <CalendarDays size={20} />
-          </div>
-          <div>
-            <p className="stat-label">This Week</p>
-            <p className="stat-value">{recentEntries.length}</p>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon drafts">
-            <FileText size={20} />
-          </div>
-          <div>
-            <p className="stat-label">Drafts</p>
-            <p className="stat-value">{draftEntries.length}</p>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon commits">
-            <GitBranch size={20} />
-          </div>
-          <div>
-            <p className="stat-label">New Commits</p>
-            <p className="stat-value">{temporaryDrafts.length}</p>
-          </div>
-        </div>
-      </div>
-
       {/* Sync Status */}
       {lastSyncTime && (
         <div className="mb-6 text-sm text-gray-500 dark:text-gray-400">
@@ -403,7 +363,7 @@ const DiaryEntries: React.FC = () => {
                       New Commit
                     </span>
                   </div>
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2 break-words">
                     {draft.title || 'Untitled Entry'}
                   </h2>
                 </div>
@@ -428,7 +388,7 @@ const DiaryEntries: React.FC = () => {
               </div>
 
               {/* Draft Content */}
-              <p className="text-gray-600 dark:text-gray-300 mb-4 italic">
+              <p className="text-gray-600 dark:text-gray-300 mb-4 italic break-words">
                 {draft.content || 'Click edit to add your thoughts about this commit...'}
               </p>
 
@@ -436,23 +396,23 @@ const DiaryEntries: React.FC = () => {
               <div className="mb-4 p-3 bg-white/70 dark:bg-gray-700/70 rounded-lg">
                 {/* Commit Message */}
                 {draft.commit_message && (
-                  <div className="mb-3 text-sm text-gray-800 dark:text-gray-200 font-medium">
+                  <div className="mb-3 text-sm text-gray-800 dark:text-gray-200 font-medium break-words">
                     "{draft.commit_message}"
                   </div>
                 )}
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                    <GitBranch size={14} />
-                    <span className="font-mono bg-gray-200 dark:bg-gray-600 px-2 py-1 rounded text-xs">
+                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 min-w-0 flex-1">
+                    <GitBranch size={14} className="flex-shrink-0" />
+                    <span className="font-mono bg-gray-200 dark:bg-gray-600 px-2 py-1 rounded text-xs flex-shrink-0">
                       {draft.commit_hash.substring(0, 7)}
                     </span>
-                    <span>in {draft.commit_repo}</span>
+                    <span className="truncate">in {draft.commit_repo}</span>
                   </div>
                   <a
                     href={getCommitUrl(draft.commit_hash, draft.commit_repo)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 transition-colors"
+                    className="flex items-center gap-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 transition-colors flex-shrink-0 ml-2"
                     title="View commit on GitHub"
                   >
                     <ExternalLink size={14} />
@@ -508,7 +468,7 @@ const DiaryEntries: React.FC = () => {
                       </span>
                     )}
                   </div>
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2 break-words">
                     {entry.title}
                   </h2>
                 </div>
@@ -533,7 +493,7 @@ const DiaryEntries: React.FC = () => {
               </div>
 
               {/* Entry Content */}
-              <p className="text-gray-600 dark:text-gray-300 mb-4 line-clamp-3">
+              <p className="text-gray-600 dark:text-gray-300 mb-4 line-clamp-3 break-words">
                 {entry.content || 'No content yet...'}
               </p>
 
@@ -548,18 +508,18 @@ const DiaryEntries: React.FC = () => {
               {entry.commit_hash && entry.commit_repo && (
                 <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                      <GitBranch size={14} />
-                      <span className="font-mono bg-gray-200 dark:bg-gray-600 px-2 py-1 rounded text-xs">
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 min-w-0 flex-1">
+                      <GitBranch size={14} className="flex-shrink-0" />
+                      <span className="font-mono bg-gray-200 dark:bg-gray-600 px-2 py-1 rounded text-xs flex-shrink-0">
                         {entry.commit_hash.substring(0, 7)}
                       </span>
-                      <span>in {entry.commit_repo}</span>
+                      <span className="truncate">in {entry.commit_repo}</span>
                     </div>
                     <a
                       href={getCommitUrl(entry.commit_hash, entry.commit_repo)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 transition-colors"
+                      className="flex items-center gap-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 transition-colors flex-shrink-0 ml-2"
                       title="View commit on GitHub"
                     >
                       <ExternalLink size={14} />
