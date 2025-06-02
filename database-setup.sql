@@ -1,6 +1,17 @@
 -- Database setup for Hackathon Journal App
 -- Run this in your Supabase SQL editor
 
+-- Function to get current user ID (must be defined before RLS policies)
+CREATE OR REPLACE FUNCTION current_user_id() RETURNS TEXT AS $$
+BEGIN
+  RETURN COALESCE(
+    current_setting('request.jwt.claims', true)::json->>'sub',
+    current_setting('request.jwt.claims', true)::json->>'user_id',
+    ''
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Create hackathon_entries table
 CREATE TABLE IF NOT EXISTS hackathon_entries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -34,7 +45,7 @@ CREATE INDEX IF NOT EXISTS hackathon_entries_created_at_idx ON hackathon_entries
 -- Enable Row Level Security (RLS)
 ALTER TABLE hackathon_entries ENABLE ROW LEVEL SECURITY;
 
--- Create RLS policies
+-- Create RLS policies (now that current_user_id() function exists)
 -- Users can only see their own hackathon entries
 CREATE POLICY "Users can view own hackathon entries" ON hackathon_entries
   FOR SELECT USING (user_id = current_user_id());
@@ -50,17 +61,6 @@ CREATE POLICY "Users can update own hackathon entries" ON hackathon_entries
 -- Users can delete their own hackathon entries
 CREATE POLICY "Users can delete own hackathon entries" ON hackathon_entries
   FOR DELETE USING (user_id = current_user_id());
-
--- Function to get current user ID (you may need to adjust this based on your auth setup)
-CREATE OR REPLACE FUNCTION current_user_id() RETURNS TEXT AS $$
-BEGIN
-  RETURN COALESCE(
-    current_setting('request.jwt.claims', true)::json->>'sub',
-    current_setting('request.jwt.claims', true)::json->>'user_id',
-    ''
-  );
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Create storage bucket for hackathon files (if not exists)
 INSERT INTO storage.buckets (id, name, public)

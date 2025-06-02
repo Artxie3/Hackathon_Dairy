@@ -146,7 +146,7 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="stat-info">
                 <h3>Coding Time</h3>
-                <p className="stat-value">{loading ? '...' : '4h 25m'}</p>
+                <p className="stat-value">{loading ? '...' : '0h 0m'}</p>
               </div>
             </div>
             
@@ -176,7 +176,7 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="stat-info">
                 <h3>Listened</h3>
-                <p className="stat-value">{loading ? '...' : '3h 40m'}</p>
+                <p className="stat-value">{loading ? '...' : '0h 0m'}</p>
               </div>
             </div>
           </div>
