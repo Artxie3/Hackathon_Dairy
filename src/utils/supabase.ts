@@ -91,9 +91,6 @@ export function getUserAudioPath(userId: string, filename: string) {
   return `${userId}/${filename}`;
 }
 
-// Call initializeStorage when the app starts
-initializeStorage();
-
 // Types for our database tables
 export interface DiaryEntry {
   id: string;
@@ -103,11 +100,36 @@ export interface DiaryEntry {
   mood: string;
   commit_hash?: string;
   commit_repo?: string;
+  commit_message?: string;
   audio_url?: string;
   created_at: string;
   updated_at: string;
   is_draft: boolean;
   tags: string[];
+}
+
+export interface HackathonEntry {
+  id: string;
+  user_id: string;
+  title: string;
+  organizer: string;
+  description: string;
+  start_date: string;
+  end_date: string;
+  submission_deadline: string;
+  status: 'upcoming' | 'ongoing' | 'completed' | 'submitted';
+  devpost_url?: string;
+  project_title?: string;
+  project_description?: string;
+  project_url?: string;
+  team_members: string[];
+  technologies: string[];
+  prizes: string[];
+  notes: string;
+  timezone?: string;
+  attachments?: string[]; // URLs to uploaded files
+  created_at: string;
+  updated_at: string;
 }
 
 // Helper functions for diary entries
@@ -167,4 +189,204 @@ export const diaryEntries = {
     if (error && error.code !== 'PGRST116') throw error; // PGRST116 is "no rows returned"
     return data;
   }
-}; 
+};
+
+// Helper functions for hackathon entries
+export const hackathonEntries = {
+  async create(entry: Partial<HackathonEntry>) {
+    const { data, error } = await supabase
+      .from('hackathon_entries')
+      .insert(entry)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id: string, updates: Partial<HackathonEntry>) {
+    const { data, error } = await supabase
+      .from('hackathon_entries')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async delete(id: string) {
+    // Also delete associated files if any
+    const { data: hackathon } = await supabase
+      .from('hackathon_entries')
+      .select('attachments')
+      .eq('id', id)
+      .single();
+
+    if (hackathon?.attachments?.length) {
+      // Delete files from storage
+      for (const attachment of hackathon.attachments) {
+        try {
+          const path = attachment.replace(`${supabaseUrl}/storage/v1/object/public/hackathon-files/`, '');
+          await supabase.storage.from('hackathon-files').remove([path]);
+        } catch (err) {
+          console.warn('Failed to delete attachment:', err);
+        }
+      }
+    }
+
+    const { error } = await supabase
+      .from('hackathon_entries')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  },
+
+  async getByUser(userId: string) {
+    const { data, error } = await supabase
+      .from('hackathon_entries')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async getByStatus(userId: string, status: string) {
+    const { data, error } = await supabase
+      .from('hackathon_entries')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', status)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data;
+  }
+};
+
+// Initialize storage buckets for hackathon files
+export async function initializeHackathonStorage() {
+  try {
+    // Wait for auth to be ready
+    const isAuthenticated = await waitForAuth();
+    if (!isAuthenticated) {
+      console.warn('No authenticated user found after waiting. Hackathon storage operations may fail.');
+      return;
+    }
+
+    // Get the authenticated user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.warn('No authenticated user found. Hackathon storage operations may fail.');
+      return;
+    }
+
+    // Check if bucket exists
+    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+    
+    if (listError) {
+      // If we get a permission error, the bucket might exist but we can't list it
+      if (listError.message.includes('Permission denied')) {
+        console.info('Cannot list buckets, assuming hackathon-files exists');
+        return;
+      }
+      throw listError;
+    }
+
+    const hackathonFilesBucket = buckets?.find(bucket => bucket.name === 'hackathon-files');
+
+    if (!hackathonFilesBucket) {
+      console.info('Creating hackathon-files bucket...');
+      const { error: createError } = await supabase.storage.createBucket('hackathon-files', {
+        public: true, // Make public for easy access to attachments
+        fileSizeLimit: 104857600, // 100MB limit
+        allowedMimeTypes: [
+          'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+          'application/pdf',
+          'text/plain', 'text/markdown',
+          'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          'application/zip', 'application/x-rar-compressed',
+          'video/mp4', 'video/webm', 'video/quicktime',
+          'audio/mpeg', 'audio/wav', 'audio/ogg'
+        ]
+      });
+
+      if (createError) {
+        // If bucket already exists or we don't have permission, that's okay
+        if (!createError.message.includes('Permission denied') && 
+            !createError.message.includes('already exists')) {
+          throw createError;
+        }
+      }
+    }
+
+    // Test bucket access by trying to list files
+    const { error: testError } = await supabase.storage
+      .from('hackathon-files')
+      .list(user.id);
+
+    if (testError && !testError.message.includes('Permission denied')) {
+      console.warn('Hackathon storage test failed:', testError.message);
+    }
+  } catch (err) {
+    console.error('Error initializing hackathon storage:', err);
+    // Don't throw - let the app continue even if storage init fails
+  }
+}
+
+// Helper function to upload hackathon files
+export async function uploadHackathonFile(file: File, hackathonId: string): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
+
+  // Generate unique filename
+  const timestamp = Date.now();
+  const fileExtension = file.name.split('.').pop();
+  const filename = `${hackathonId}-${timestamp}.${fileExtension}`;
+  const filePath = `${user.id}/${filename}`;
+
+  const { data, error } = await supabase.storage
+    .from('hackathon-files')
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: false
+    });
+
+  if (error) throw error;
+
+  // Get the public URL
+  const { data: { publicUrl } } = supabase.storage
+    .from('hackathon-files')
+    .getPublicUrl(filePath);
+
+  return publicUrl;
+}
+
+// Helper function to delete hackathon file
+export async function deleteHackathonFile(fileUrl: string): Promise<void> {
+  try {
+    const path = fileUrl.replace(`${supabaseUrl}/storage/v1/object/public/hackathon-files/`, '');
+    const { error } = await supabase.storage
+      .from('hackathon-files')
+      .remove([path]);
+
+    if (error) throw error;
+  } catch (err) {
+    console.error('Error deleting hackathon file:', err);
+    throw err;
+  }
+}
+
+// Initialize both storage systems when the app starts
+Promise.all([initializeStorage(), initializeHackathonStorage()]); 

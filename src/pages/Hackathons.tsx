@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Calendar, Clock, Trophy, ExternalLink, Edit, Trash2, Users, Code, AlertCircle, Download, Loader, Globe } from 'lucide-react';
+import { Plus, Calendar, Clock, Trophy, ExternalLink, Edit, Trash2, Users, Code, AlertCircle, Download, Loader, Globe, Paperclip } from 'lucide-react';
 import { useHackathons, Hackathon } from '../contexts/HackathonContext';
 import { DevpostScraper } from '../utils/devpostScraper';
 import TimezoneConfirmModal from '../components/TimezoneConfirmModal';
+import FileUploader from '../components/FileUploader';
 import '../styles/Hackathons.css';
 
 const Hackathons: React.FC = () => {
@@ -15,7 +16,10 @@ const Hackathons: React.FC = () => {
     deleteHackathon,
     getUpcomingDeadlines,
     getOngoingHackathons,
-    getCompletedHackathons
+    getCompletedHackathons,
+    uploadFile,
+    deleteFile,
+    syncFromLocalStorage
   } = useHackathons();
   
   const [activeTab, setActiveTab] = useState<'all' | 'ongoing' | 'upcoming' | 'completed'>('all');
@@ -42,7 +46,8 @@ const Hackathons: React.FC = () => {
     technologies: [],
     prizes: [],
     notes: '',
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    attachments: []
   });
 
   const [showTimezoneModal, setShowTimezoneModal] = useState(false);
@@ -155,14 +160,18 @@ const Hackathons: React.FC = () => {
       technologies: [],
       prizes: [],
       notes: '',
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      attachments: []
     });
     setIsCreating(false);
     setEditingHackathon(null);
   };
 
   const handleEdit = (hackathon: Hackathon) => {
-    setFormData(hackathon);
+    setFormData({
+      ...hackathon,
+      attachments: hackathon.attachments || []
+    });
     setEditingHackathon(hackathon);
     setIsCreating(true);
   };
@@ -491,6 +500,33 @@ const Hackathons: React.FC = () => {
     return timezones;
   };
 
+  const handleFileUpload = async (file: File): Promise<string> => {
+    if (!editingHackathon?.id && !formData.id) {
+      throw new Error('Please save the hackathon first before uploading files');
+    }
+    
+    const hackathonId = editingHackathon?.id || formData.id!;
+    return await uploadFile(file, hackathonId);
+  };
+
+  const handleFileDelete = async (fileUrl: string): Promise<void> => {
+    if (!editingHackathon?.id && !formData.id) {
+      throw new Error('Hackathon not found');
+    }
+    
+    const hackathonId = editingHackathon?.id || formData.id!;
+    await deleteFile(fileUrl, hackathonId);
+  };
+
+  const handleSyncFromLocalStorage = async () => {
+    try {
+      await syncFromLocalStorage();
+      setImportError(null);
+    } catch (err) {
+      setImportError('Failed to sync data from localStorage');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -781,6 +817,23 @@ const Hackathons: React.FC = () => {
                 />
               </div>
 
+              {/* File Upload Section */}
+              {(editingHackathon || formData.id) && (
+                <div className="form-group">
+                  <label className="flex items-center gap-2">
+                    <Paperclip size={16} />
+                    Attachments
+                  </label>
+                  <FileUploader
+                    onFileUpload={handleFileUpload}
+                    onFileDelete={handleFileDelete}
+                    existingFiles={formData.attachments || []}
+                    maxFiles={10}
+                    maxSize={100}
+                  />
+                </div>
+              )}
+
               <div className="form-actions">
                 <button type="button" onClick={resetForm} className="btn btn-secondary">
                   Cancel
@@ -898,8 +951,18 @@ const Hackathons: React.FC = () => {
               </div>
             </div>
 
-            {hackathon.devpostUrl && (
-              <div className="hackathon-links">
+            {/* Attachments Display */}
+            {hackathon.attachments && hackathon.attachments.length > 0 && (
+              <div className="hackathon-attachments">
+                <div className="attachments-header">
+                  <Paperclip size={14} />
+                  <span>{hackathon.attachments.length} attachment{hackathon.attachments.length > 1 ? 's' : ''}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="hackathon-links">
+              {hackathon.devpostUrl && (
                 <a 
                   href={hackathon.devpostUrl} 
                   target="_blank" 
@@ -909,8 +972,8 @@ const Hackathons: React.FC = () => {
                   <ExternalLink size={14} />
                   View on Devpost
                 </a>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -928,13 +991,21 @@ const Hackathons: React.FC = () => {
             }
           </p>
           {activeTab === 'all' && (
-            <button
-              onClick={() => setIsCreating(true)}
-              className="btn btn-primary mt-4"
-            >
-              <Plus size={20} />
-              Add Your First Hackathon
-            </button>
+            <div className="flex gap-3 justify-center mt-4">
+              <button
+                onClick={handleSyncFromLocalStorage}
+                className="btn btn-secondary"
+              >
+                Sync from Local Storage
+              </button>
+              <button
+                onClick={() => setIsCreating(true)}
+                className="btn btn-primary"
+              >
+                <Plus size={20} />
+                Add Your First Hackathon
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -983,4 +1054,4 @@ const Hackathons: React.FC = () => {
   );
 };
 
-export default Hackathons; 
+export default Hackathons;
