@@ -10,8 +10,6 @@ const Settings: React.FC = () => {
   const [syncInterval, setSyncInterval] = useState(10); // minutes
   const [excludedRepos, setExcludedRepos] = useState<string[]>([]);
   const [newExcludedRepo, setNewExcludedRepo] = useState('');
-  const [emailNotifications, setEmailNotifications] = useState(false);
-  const [desktopNotifications, setDesktopNotifications] = useState(false);
   const [theme, setTheme] = useState('system');
   const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -25,8 +23,6 @@ const Settings: React.FC = () => {
         setAutoSyncEnabled(settings.autoSyncEnabled ?? true);
         setSyncInterval(settings.syncInterval ?? 10);
         setExcludedRepos(settings.excludedRepos ?? []);
-        setEmailNotifications(settings.emailNotifications ?? false);
-        setDesktopNotifications(settings.desktopNotifications ?? false);
         setTheme(settings.theme ?? 'system');
         setTimezone(settings.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
       } catch (error) {
@@ -42,8 +38,6 @@ const Settings: React.FC = () => {
       autoSyncEnabled,
       syncInterval,
       excludedRepos,
-      emailNotifications,
-      desktopNotifications,
       theme,
       timezone,
     };
@@ -271,31 +265,6 @@ const Settings: React.FC = () => {
                 <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                   This timezone will be used to display all dates and times across the application.
                 </p>
-              </div>
-            </div>
-
-            {/* Notifications */}
-            <div>
-              <h3 className="font-medium text-gray-900 dark:text-white mb-4">Notifications</h3>
-              <div className="space-y-4">
-                <label className="flex items-center space-x-3">
-                  <input 
-                    type="checkbox" 
-                    checked={emailNotifications}
-                    onChange={(e) => setEmailNotifications(e.target.checked)}
-                    className="form-checkbox h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                  />
-                  <span className="text-gray-700 dark:text-gray-300">Enable email notifications</span>
-                </label>
-                <label className="flex items-center space-x-3">
-                  <input 
-                    type="checkbox" 
-                    checked={desktopNotifications}
-                    onChange={(e) => setDesktopNotifications(e.target.checked)}
-                    className="form-checkbox h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                  />
-                  <span className="text-gray-700 dark:text-gray-300">Enable desktop notifications</span>
-                </label>
               </div>
             </div>
 
