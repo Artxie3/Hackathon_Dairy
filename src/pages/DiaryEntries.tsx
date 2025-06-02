@@ -284,7 +284,7 @@ const DiaryEntries: React.FC = () => {
       )}
 
       {/* Entries Grid */}
-      <div className="grid gap-4 xl:grid-cols-3 lg:grid-cols-3 md:grid-cols-2 sm:grid-cols-1 grid-cols-1">
+      <div className="grid gap-6 md:grid-cols-2">
         {/* Temporary Drafts */}
         {filteredTemporaryDrafts.map(draft => (
           <div
@@ -398,13 +398,16 @@ const DiaryEntries: React.FC = () => {
                   <div className="flex items-center gap-3 mb-2">
                     <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
                       {new Date(entry.created_at).toLocaleDateString('en-US', {
-                        month: 'numeric',
+                        month: 'short',
                         day: 'numeric',
                         year: 'numeric',
+                      })} at {new Date(entry.created_at).toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit',
                       })}
                     </span>
                     {entry.mood && (
-                      <span className="text-3xl">{entry.mood}</span>
+                      <span className="text-2xl">{entry.mood}</span>
                     )}
                     {entry.is_draft && (
                       <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full text-xs font-medium">
