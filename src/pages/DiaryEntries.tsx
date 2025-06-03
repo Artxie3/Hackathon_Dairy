@@ -497,6 +497,27 @@ const DiaryEntries: React.FC = () => {
                 {entry.content || 'No content yet...'}
               </p>
 
+              {/* Images */}
+              {entry.images && entry.images.length > 0 && (
+                <div className="mb-4">
+                  <div className="grid grid-cols-2 gap-2">
+                    {entry.images.slice(0, 4).map((imageUrl, index) => (
+                      <img
+                        key={index}
+                        src={imageUrl}
+                        alt={`Entry image ${index + 1}`}
+                        className="w-full h-32 object-cover rounded-lg"
+                      />
+                    ))}
+                  </div>
+                  {entry.images.length > 4 && (
+                    <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                      +{entry.images.length - 4} more images
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Audio Player */}
               {entry.audio_url && (
                 <div className="mb-4">

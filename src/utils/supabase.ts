@@ -102,6 +102,7 @@ export interface DiaryEntry {
   commit_repo?: string;
   commit_message?: string;
   audio_url?: string;
+  images?: string[];  // Array of image URLs
   created_at: string;
   updated_at: string;
   is_draft: boolean;
@@ -389,4 +390,23 @@ export async function deleteHackathonFile(fileUrl: string): Promise<void> {
 }
 
 // Initialize both storage systems when the app starts
-Promise.all([initializeStorage(), initializeHackathonStorage()]); 
+Promise.all([initializeStorage(), initializeHackathonStorage()]);
+
+// Helper functions for image uploads
+export const uploadImage = async (file: File): Promise<string> => {
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+  const filePath = `images/${fileName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('diary-images')
+    .upload(filePath, file);
+
+  if (uploadError) throw uploadError;
+
+  const { data: { publicUrl } } = supabase.storage
+    .from('diary-images')
+    .getPublicUrl(filePath);
+
+  return publicUrl;
+}; 

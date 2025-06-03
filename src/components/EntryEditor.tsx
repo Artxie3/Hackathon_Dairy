@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { Save, X } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { Save, X, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { VoiceRecorder } from './VoiceRecorder';
 import { AudioPlayer } from './AudioPlayer';
 import { DiaryEntry } from '../utils/supabase';
+import { uploadImage } from '../utils/supabase';
 
 interface EntryEditorProps {
   entry: Partial<DiaryEntry>;
@@ -26,7 +27,35 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
   const [content, setContent] = useState(entry.content || '');
   const [mood, setMood] = useState(entry.mood || '');
   const [audioUrl, setAudioUrl] = useState(entry.audio_url || '');
+  const [images, setImages] = useState<string[]>(entry.images || []);
   const [error, setError] = useState<string | null>(null);
+
+  const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.indexOf('image') !== -1) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) continue;
+
+        try {
+          const imageUrl = await uploadImage(file);
+          setImages(prev => [...prev, imageUrl]);
+          setError(null);
+        } catch (err) {
+          console.error('Error uploading image:', err);
+          setError('Failed to upload image. Please try again.');
+        }
+      }
+    }
+  }, []);
+
+  const handleRemoveImage = (imageUrl: string) => {
+    setImages(prev => prev.filter(url => url !== imageUrl));
+  };
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -41,6 +70,7 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
         content: content.trim(),
         mood,
         audio_url: audioUrl,
+        images,
         is_draft: false,
       });
       setError(null);
@@ -81,6 +111,43 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
         className="w-full px-4 py-2 text-lg font-semibold bg-transparent border-b-2 border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:outline-none"
       />
 
+      {/* Content */}
+      <textarea
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        onPaste={handlePaste}
+        placeholder="Write your thoughts..."
+        rows={6}
+        className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:outline-none resize-none"
+      />
+
+      {/* Image Gallery */}
+      {images.length > 0 && (
+        <div className="mb-4">
+          <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+            <ImageIcon size={16} />
+            Images
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            {images.map((imageUrl, index) => (
+              <div key={index} className="relative group">
+                <img
+                  src={imageUrl}
+                  alt={`Entry image ${index + 1}`}
+                  className="w-full h-32 object-cover rounded-lg"
+                />
+                <button
+                  onClick={() => handleRemoveImage(imageUrl)}
+                  className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Mood Selection */}
       <div className="flex flex-wrap gap-3">
         {MOODS.map(({ emoji, label }) => (
@@ -98,15 +165,6 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
           </button>
         ))}
       </div>
-
-      {/* Content */}
-      <textarea
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        placeholder="Write your thoughts..."
-        rows={6}
-        className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:outline-none resize-none"
-      />
 
       {/* Voice Note */}
       <div>
