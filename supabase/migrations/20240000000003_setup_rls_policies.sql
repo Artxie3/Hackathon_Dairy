@@ -32,4 +32,4 @@ CREATE POLICY "Users can delete their own entries"
     TO authenticated
     USING (user_id = auth.uid()::text); 
 
--- Proving new commit, third try
+-- Proving new commit, fourth try
