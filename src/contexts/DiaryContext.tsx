@@ -253,7 +253,10 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
         const commits = payload.commits || [];
 
         for (const commit of commits) {
-          const commitTime = new Date(created_at);
+          // Use the actual commit timestamp, not the push event timestamp
+          const commitTime = commit.timestamp ? new Date(commit.timestamp) : new Date(created_at);
+          
+          console.log(`Checking commit: ${commit.sha.substring(0, 7)} - ${commit.message} - ${commitTime.toISOString()}`);
           
           // Check if we already have an entry or draft for this commit
           const existingEntry = entries.find(entry => 
@@ -264,15 +267,19 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
           );
 
           if (!existingEntry && !existingDraft) {
+            console.log(`  -> Commit ${commit.sha.substring(0, 7)} is new and eligible`);
             // Track the latest commit
             if (!latestCommitTime || commitTime > latestCommitTime) {
+              console.log(`  -> This is now the latest commit (previous: ${latestCommitTime?.toISOString() || 'none'})`);
               latestCommitTime = commitTime;
               latestCommitData = {
                 commit,
                 repoName,
-                created_at
+                created_at: commit.timestamp || created_at // Use commit timestamp if available
               };
             }
+          } else {
+            console.log(`  -> Commit ${commit.sha.substring(0, 7)} already exists, skipping`);
           }
         }
       }
