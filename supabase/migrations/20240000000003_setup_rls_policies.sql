@@ -31,3 +31,5 @@ CREATE POLICY "Users can delete their own entries"
     FOR DELETE
     TO authenticated
     USING (user_id = auth.uid()::text); 
+
+-- Proving new commit
