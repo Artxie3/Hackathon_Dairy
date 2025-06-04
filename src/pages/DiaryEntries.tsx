@@ -19,7 +19,8 @@ const DiaryEntries: React.FC = () => {
     isSyncing,
     lastSyncTime,
     convertTemporaryDraft,
-    dismissTemporaryDraft
+    dismissTemporaryDraft,
+    clearTemporaryDrafts
   } = useDiary();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -225,6 +226,20 @@ const DiaryEntries: React.FC = () => {
               <GitBranch size={20} />
             )}
             {isSyncing ? 'Syncing...' : 'Sync Commits'}
+          </button>
+          <button
+            onClick={() => {
+              console.log('=== DEBUG INFO ===');
+              console.log('Current entries:', entries.length);
+              console.log('Current temporary drafts:', temporaryDrafts.length);
+              console.log('Entries:', entries);
+              console.log('Temporary drafts:', temporaryDrafts);
+              clearTemporaryDrafts();
+            }}
+            className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 flex items-center gap-2 transition-colors"
+            title="Clear drafts and debug"
+          >
+            🐛 Debug
           </button>
           <button
             onClick={handleNewEntry}

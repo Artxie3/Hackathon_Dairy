@@ -28,6 +28,7 @@ interface DiaryContextType {
   lastSyncTime: Date | null;
   convertTemporaryDraft: (draftId: string) => Promise<DiaryEntry>;
   dismissTemporaryDraft: (draftId: string) => void;
+  clearTemporaryDrafts: () => void;
 }
 
 const DiaryContext = createContext<DiaryContextType | undefined>(undefined);
@@ -153,6 +154,11 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
     setTemporaryDrafts(prev => prev.filter(d => d.id !== draftId));
   };
 
+  const clearTemporaryDrafts = () => {
+    console.log('Manually clearing all temporary drafts');
+    setTemporaryDrafts([]);
+  };
+
   const handleCommitEvent = async (commitHash: string, repo: string, message: string) => {
     if (!user?.username) return;
 
@@ -237,6 +243,7 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
       console.log('Found push events:', pushEvents.length);
 
       let allNewCommits = [];
+      let allCommits = []; // For debugging
 
       // Collect all commits from all push events
       for (const event of pushEvents) {
@@ -245,12 +252,24 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
 
         // Check if this repository is excluded
         if (excludedRepos.includes(repoName)) {
+          console.log('Skipping excluded repo:', repoName);
           continue;
         }
 
         const commits = payload.commits || [];
+        console.log(`Processing ${commits.length} commits from ${repoName} (event: ${created_at})`);
 
         for (const commit of commits) {
+          console.log(`  Commit: ${commit.sha.substring(0, 7)} - "${commit.message}" (${commit.timestamp || created_at})`);
+          
+          // Add to all commits for debugging
+          allCommits.push({
+            sha: commit.sha.substring(0, 7),
+            message: commit.message,
+            repo: repoName,
+            timestamp: commit.timestamp || created_at
+          });
+
           // Check if we already have an entry or draft for this commit
           const existingEntry = entries.find(entry => 
             entry.commit_hash === commit.sha
@@ -259,7 +278,15 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
             draft.commit_hash === commit.sha
           );
 
+          if (existingEntry) {
+            console.log(`    -> Found existing entry for ${commit.sha.substring(0, 7)}`);
+          }
+          if (existingDraft) {
+            console.log(`    -> Found existing draft for ${commit.sha.substring(0, 7)}`);
+          }
+
           if (!existingEntry && !existingDraft) {
+            console.log(`    -> New commit found: ${commit.sha.substring(0, 7)}`);
             allNewCommits.push({
               commit,
               repoName,
@@ -269,6 +296,21 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
           }
         }
       }
+
+      console.log('=== DEBUG: All commits found ===');
+      allCommits.forEach((commit, index) => {
+        console.log(`${index + 1}. ${commit.sha} - "${commit.message}" from ${commit.repo} (${commit.timestamp})`);
+      });
+
+      console.log('=== DEBUG: Current entries ===');
+      entries.forEach((entry, index) => {
+        console.log(`${index + 1}. Entry: ${entry.commit_hash?.substring(0, 7) || 'no-hash'} - "${entry.title}"`);
+      });
+
+      console.log('=== DEBUG: Current temporary drafts ===');
+      temporaryDrafts.forEach((draft, index) => {
+        console.log(`${index + 1}. Draft: ${draft.commit_hash.substring(0, 7)} - "${draft.commit_message}"`);
+      });
 
       // Sort commits by their actual commit timestamp (most recent first)
       allNewCommits.sort((a, b) => {
@@ -280,6 +322,7 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
       console.log('Found new commits:', allNewCommits.length);
       if (allNewCommits.length > 0) {
         console.log('Latest commit:', allNewCommits[0].commit.sha, 'from', allNewCommits[0].repoName);
+        console.log('Latest commit message:', allNewCommits[0].commit.message);
       }
 
       // If we found new commits, create a draft for the latest one
@@ -288,7 +331,11 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
         console.log('Creating temporary draft for latest commit:', latestCommitData.commit.sha);
         
         // Remove any existing automatic temporary drafts before creating the new one
-        setTemporaryDrafts(prev => prev.filter(draft => !draft.tags.includes('commit')));
+        setTemporaryDrafts(prev => {
+          const filtered = prev.filter(draft => !draft.tags.includes('commit'));
+          console.log(`Removed ${prev.length - filtered.length} existing commit drafts`);
+          return filtered;
+        });
         
         // Extract meaningful content from commit message
         const lines = latestCommitData.commit.message.split('\n');
@@ -307,6 +354,7 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
         };
 
         setTemporaryDrafts(prev => [temporaryDraft, ...prev]);
+        console.log('Created new temporary draft:', temporaryDraft);
       }
 
       setLastSyncTime(new Date());
@@ -339,6 +387,7 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
       lastSyncTime,
       convertTemporaryDraft,
       dismissTemporaryDraft,
+      clearTemporaryDrafts,
     }}>
       {children}
     </DiaryContext.Provider>
