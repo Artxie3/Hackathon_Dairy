@@ -157,33 +157,28 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
     if (!user?.username) return;
 
     try {
-      // Check for existing entry for this commit (both saved and temporary)
+      // Check for existing entry for this commit
       const existingEntry = entries.find(entry => entry.commit_hash === commitHash);
-      const existingDraft = temporaryDrafts.find(draft => draft.commit_hash === commitHash);
       
-      if (!existingEntry && !existingDraft) {
-        // Remove any existing automatic temporary drafts before creating a new one
-        // This ensures only the latest commit has a temporary draft
-        setTemporaryDrafts(prev => prev.filter(draft => !draft.tags.includes('commit')));
-
-        // Create temporary draft instead of saving immediately
+      if (!existingEntry) {
+        // Extract meaningful content from commit message
         const lines = message.split('\n');
         const commitMessage = lines[0] || '';
 
-        const temporaryDraft: TemporaryDraft = {
-          id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          title: '', // Don't use commit message as title
+        // Create a new diary entry
+        const newEntry = await createEntry({
+          title: commitMessage, // Use first line of commit message as title
           content: '', // Keep content empty for user to fill
           commit_hash: commitHash,
           commit_repo: repo,
           commit_message: commitMessage,
-          created_at: new Date().toISOString(),
-          tags: ['commit'], // Only add "commit" tag
-          isTemporary: true,
-        };
+          is_draft: true,
+          tags: ['commit', 'auto-generated'],
+          created_at: new Date().toISOString()
+        });
 
-        setTemporaryDrafts(prev => [temporaryDraft, ...prev]);
-        console.log('Created temporary draft for commit (discarded previous automatic drafts):', commitHash);
+        console.log('Created new diary entry for commit:', commitHash);
+        setError(null);
       }
     } catch (err) {
       console.error('Error handling commit event:', err);
@@ -236,7 +231,7 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
       const pushEvents = events.filter((event: any) => event.type === 'PushEvent');
       console.log('Found push events:', pushEvents.length);
 
-      let newDraftsCount = 0;
+      let newEntriesCount = 0;
       let latestCommitTime = null;
       let latestCommitData = null;
 
@@ -255,15 +250,12 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
         for (const commit of commits) {
           const commitTime = new Date(created_at);
           
-          // Check if we already have an entry or draft for this commit
+          // Check if we already have an entry for this commit
           const existingEntry = entries.find(entry => 
             entry.commit_hash === commit.sha
           );
-          const existingDraft = temporaryDrafts.find(draft => 
-            draft.commit_hash === commit.sha
-          );
 
-          if (!existingEntry && !existingDraft) {
+          if (!existingEntry) {
             // Track the latest commit
             if (!latestCommitTime || commitTime > latestCommitTime) {
               latestCommitTime = commitTime;
@@ -277,37 +269,32 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // If we found a latest commit, create a draft for it (and remove any existing automatic drafts)
+      // If we found a latest commit, create an entry for it
       if (latestCommitData) {
-        console.log('Creating temporary draft for latest commit:', latestCommitData.commit.sha);
-        
-        // Remove any existing automatic temporary drafts before creating the new one
-        setTemporaryDrafts(prev => prev.filter(draft => !draft.tags.includes('commit')));
+        console.log('Creating entry for latest commit:', latestCommitData.commit.sha);
         
         // Extract meaningful content from commit message
         const lines = latestCommitData.commit.message.split('\n');
         const commitMessage = lines[0] || '';
 
-        const temporaryDraft: TemporaryDraft = {
-          id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          title: '', // Don't use commit message as title
+        await createEntry({
+          title: commitMessage, // Use first line of commit message as title
           content: '', // Keep content empty for user to fill
           commit_hash: latestCommitData.commit.sha,
           commit_repo: latestCommitData.repoName,
           commit_message: commitMessage,
           created_at: latestCommitData.created_at,
-          tags: ['commit'], // Only add "commit" tag
-          isTemporary: true,
-        };
+          is_draft: true,
+          tags: ['commit', 'auto-generated']
+        });
 
-        setTemporaryDrafts(prev => [temporaryDraft, ...prev]);
-        newDraftsCount = 1;
+        newEntriesCount = 1;
       }
 
       setLastSyncTime(new Date());
-      console.log(`Sync completed. ${newDraftsCount > 0 ? `Created temporary draft for latest commit (${newDraftsCount} draft total).` : 'No new commits found.'}`);
+      console.log(`Sync completed. ${newEntriesCount > 0 ? `Created entry for latest commit (${newEntriesCount} entry total).` : 'No new commits found.'}`);
       
-      if (newDraftsCount > 0) {
+      if (newEntriesCount > 0) {
         setError(null);
       }
 
