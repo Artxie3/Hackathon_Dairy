@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { Save, X, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { VoiceRecorder } from './VoiceRecorder';
 import { AudioPlayer } from './AudioPlayer';
+import { ImageViewer } from './ImageViewer';
 import { DiaryEntry } from '../utils/supabase';
 import { uploadImage } from '../utils/supabase';
 
@@ -29,6 +30,19 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
   const [audioUrl, setAudioUrl] = useState(entry.audio_url || '');
   const [images, setImages] = useState<string[]>(entry.images || []);
   const [error, setError] = useState<string | null>(null);
+
+  // Image viewer state
+  const [imageViewerState, setImageViewerState] = useState<{
+    isOpen: boolean;
+    images: string[];
+    initialIndex: number;
+    title?: string;
+  }>({
+    isOpen: false,
+    images: [],
+    initialIndex: 0,
+    title: ''
+  });
 
   const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items;
@@ -94,6 +108,19 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
     setAudioUrl('');
   };
 
+  const handleImageClick = (imageIndex: number) => {
+    setImageViewerState({
+      isOpen: true,
+      images: images,
+      initialIndex: imageIndex,
+      title: title || 'Entry Images'
+    });
+  };
+
+  const closeImageViewer = () => {
+    setImageViewerState(prev => ({ ...prev, isOpen: false }));
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 space-y-6">
       {error && (
@@ -134,7 +161,8 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
                 <img
                   src={imageUrl}
                   alt={`Entry image ${index + 1}`}
-                  className="w-full h-32 object-cover rounded-lg"
+                  className="w-full h-32 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => handleImageClick(index)}
                 />
                 <button
                   onClick={() => handleRemoveImage(imageUrl)}
@@ -212,6 +240,17 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onSave, onCance
           Save Entry
         </button>
       </div>
+
+      {/* Image Viewer */}
+      {imageViewerState.isOpen && (
+        <ImageViewer
+          images={imageViewerState.images}
+          initialIndex={imageViewerState.initialIndex}
+          isOpen={imageViewerState.isOpen}
+          onClose={closeImageViewer}
+          title={imageViewerState.title}
+        />
+      )}
     </div>
   );
 }; 

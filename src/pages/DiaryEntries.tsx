@@ -3,6 +3,7 @@ import { Plus, Search, Filter, X, Edit, Trash2, GitBranch, RefreshCw, ExternalLi
 import { useDiary } from '../contexts/DiaryContext';
 import { EntryEditor } from '../components/EntryEditor';
 import { AudioPlayer } from '../components/AudioPlayer';
+import { ImageViewer } from '../components/ImageViewer';
 import { DiaryEntry } from '../utils/supabase';
 import '../styles/DiaryEntries.css';
 
@@ -27,6 +28,19 @@ const DiaryEntries: React.FC = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [editingEntry, setEditingEntry] = useState<DiaryEntry | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<DiaryEntry | null>(null);
+  
+  // Image viewer state
+  const [imageViewerState, setImageViewerState] = useState<{
+    isOpen: boolean;
+    images: string[];
+    initialIndex: number;
+    title?: string;
+  }>({
+    isOpen: false,
+    images: [],
+    initialIndex: 0,
+    title: ''
+  });
 
   // Get unique tags from all entries
   const allTags = Array.from(new Set(entries.flatMap(entry => entry.tags || [])));
@@ -178,6 +192,19 @@ const DiaryEntries: React.FC = () => {
     }
     // Fallback: just use repo name (might not work for all cases)
     return `https://github.com/${repoName}/commit/${commitHash}`;
+  };
+
+  const handleImageClick = (images: string[], index: number, entryTitle: string) => {
+    setImageViewerState({
+      isOpen: true,
+      images,
+      initialIndex: index,
+      title: entryTitle
+    });
+  };
+
+  const closeImageViewer = () => {
+    setImageViewerState(prev => ({ ...prev, isOpen: false }));
   };
 
   if (loading) {
@@ -506,7 +533,8 @@ const DiaryEntries: React.FC = () => {
                         key={index}
                         src={imageUrl}
                         alt={`Entry image ${index + 1}`}
-                        className="w-full h-32 object-cover rounded-lg"
+                        className="w-full h-32 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={() => handleImageClick(entry.images!, index, entry.title)}
                       />
                     ))}
                   </div>
@@ -632,6 +660,17 @@ const DiaryEntries: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Image Viewer */}
+      {imageViewerState.isOpen && (
+        <ImageViewer
+          images={imageViewerState.images}
+          initialIndex={imageViewerState.initialIndex}
+          isOpen={imageViewerState.isOpen}
+          onClose={closeImageViewer}
+          title={imageViewerState.title}
+        />
       )}
     </div>
   );

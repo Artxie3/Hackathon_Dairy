@@ -236,10 +236,11 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
       const pushEvents = events.filter((event: any) => event.type === 'PushEvent');
       console.log('Found push events:', pushEvents.length);
 
+      let newDraftsCount = 0;
       let latestCommitTime = null;
       let latestCommitData = null;
 
-      // Find the most recent commit across all repos (regardless of existing drafts)
+      // First pass: find the most recent commit across all repos
       for (const event of pushEvents) {
         const { payload, repo, created_at } = event;
         const repoName = repo.name;
@@ -252,42 +253,32 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
         const commits = payload.commits || [];
 
         for (const commit of commits) {
-          // Use the commit timestamp if available, otherwise fall back to event time
-          const commitTimeStr = commit.timestamp || created_at;
-          const commitTime = new Date(commitTimeStr);
+          const commitTime = new Date(created_at);
           
-          console.log(`Checking commit ${commit.sha.substring(0, 7)} from ${commitTimeStr}: ${commit.message}`);
-          
-          // Track the latest commit (regardless of whether we have an entry for it)
-          if (!latestCommitTime || commitTime > latestCommitTime) {
-            latestCommitTime = commitTime;
-            latestCommitData = {
-              commit,
-              repoName,
-              created_at: commitTimeStr
-            };
+          // Check if we already have an entry or draft for this commit
+          const existingEntry = entries.find(entry => 
+            entry.commit_hash === commit.sha
+          );
+          const existingDraft = temporaryDrafts.find(draft => 
+            draft.commit_hash === commit.sha
+          );
+
+          if (!existingEntry && !existingDraft) {
+            // Track the latest commit
+            if (!latestCommitTime || commitTime > latestCommitTime) {
+              latestCommitTime = commitTime;
+              latestCommitData = {
+                commit,
+                repoName,
+                created_at
+              };
+            }
           }
         }
       }
 
-      // Check if we already have an entry or draft for the latest commit
-      let needsNewDraft = false;
+      // If we found a latest commit, create a draft for it (and remove any existing automatic drafts)
       if (latestCommitData) {
-        const existingEntry = entries.find(entry => 
-          entry.commit_hash === latestCommitData.commit.sha
-        );
-        const existingDraft = temporaryDrafts.find(draft => 
-          draft.commit_hash === latestCommitData.commit.sha
-        );
-
-        needsNewDraft = !existingEntry && !existingDraft;
-        
-        console.log(`Latest commit: ${latestCommitData.commit.sha.substring(0, 7)} - "${latestCommitData.commit.message}" from ${latestCommitData.created_at}`);
-        console.log(`Existing entry: ${!!existingEntry}, Existing draft: ${!!existingDraft}, Needs new draft: ${needsNewDraft}`);
-      }
-
-      // If we found a latest commit and don't have a draft/entry for it, create a draft
-      if (latestCommitData && needsNewDraft) {
         console.log('Creating temporary draft for latest commit:', latestCommitData.commit.sha);
         
         // Remove any existing automatic temporary drafts before creating the new one
@@ -310,12 +301,11 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
         };
 
         setTemporaryDrafts(prev => [temporaryDraft, ...prev]);
-        console.log(`Created temporary draft for commit: ${latestCommitData.commit.sha.substring(0, 7)}`);
+        newDraftsCount = 1;
       }
 
       setLastSyncTime(new Date());
-      const newDraftsCount = latestCommitData && needsNewDraft ? 1 : 0;
-      console.log(`Sync completed. ${newDraftsCount > 0 ? `Created temporary draft for latest commit (${newDraftsCount} draft total).` : 'No new commits found or latest commit already has draft/entry.'}`);
+      console.log(`Sync completed. ${newDraftsCount > 0 ? `Created temporary draft for latest commit (${newDraftsCount} draft total).` : 'No new commits found.'}`);
       
       if (newDraftsCount > 0) {
         setError(null);
