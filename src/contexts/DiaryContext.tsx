@@ -218,7 +218,7 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Fetch recent events from GitHub API
-      const eventsResponse = await fetch(`https://api.github.com/users/${user.username}/events?per_page=50`, {
+      const eventsResponse = await fetch(`https://api.github.com/users/${user.username}/events?per_page=100`, {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: 'application/vnd.github.v3+json',
@@ -236,11 +236,9 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
       const pushEvents = events.filter((event: any) => event.type === 'PushEvent');
       console.log('Found push events:', pushEvents.length);
 
-      let newDraftsCount = 0;
-      let latestCommitTime = null;
-      let latestCommitData = null;
+      let allNewCommits = [];
 
-      // First pass: find the most recent commit across all repos
+      // Collect all commits from all push events
       for (const event of pushEvents) {
         const { payload, repo, created_at } = event;
         const repoName = repo.name;
@@ -253,8 +251,6 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
         const commits = payload.commits || [];
 
         for (const commit of commits) {
-          const commitTime = new Date(created_at);
-          
           // Check if we already have an entry or draft for this commit
           const existingEntry = entries.find(entry => 
             entry.commit_hash === commit.sha
@@ -264,21 +260,31 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
           );
 
           if (!existingEntry && !existingDraft) {
-            // Track the latest commit
-            if (!latestCommitTime || commitTime > latestCommitTime) {
-              latestCommitTime = commitTime;
-              latestCommitData = {
-                commit,
-                repoName,
-                created_at
-              };
-            }
+            allNewCommits.push({
+              commit,
+              repoName,
+              eventDate: created_at,
+              commitDate: commit.timestamp || created_at // Use commit timestamp if available
+            });
           }
         }
       }
 
-      // If we found a latest commit, create a draft for it (and remove any existing automatic drafts)
-      if (latestCommitData) {
+      // Sort commits by their actual commit timestamp (most recent first)
+      allNewCommits.sort((a, b) => {
+        const dateA = new Date(a.commitDate);
+        const dateB = new Date(b.commitDate);
+        return dateB.getTime() - dateA.getTime();
+      });
+
+      console.log('Found new commits:', allNewCommits.length);
+      if (allNewCommits.length > 0) {
+        console.log('Latest commit:', allNewCommits[0].commit.sha, 'from', allNewCommits[0].repoName);
+      }
+
+      // If we found new commits, create a draft for the latest one
+      if (allNewCommits.length > 0) {
+        const latestCommitData = allNewCommits[0];
         console.log('Creating temporary draft for latest commit:', latestCommitData.commit.sha);
         
         // Remove any existing automatic temporary drafts before creating the new one
@@ -295,19 +301,18 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
           commit_hash: latestCommitData.commit.sha,
           commit_repo: latestCommitData.repoName,
           commit_message: commitMessage,
-          created_at: latestCommitData.created_at,
+          created_at: latestCommitData.eventDate,
           tags: ['commit'], // Only add "commit" tag
           isTemporary: true,
         };
 
         setTemporaryDrafts(prev => [temporaryDraft, ...prev]);
-        newDraftsCount = 1;
       }
 
       setLastSyncTime(new Date());
-      console.log(`Sync completed. ${newDraftsCount > 0 ? `Created temporary draft for latest commit (${newDraftsCount} draft total).` : 'No new commits found.'}`);
+      console.log(`Sync completed. ${allNewCommits.length > 0 ? `Created temporary draft for latest commit (1 draft total).` : 'No new commits found.'}`);
       
-      if (newDraftsCount > 0) {
+      if (allNewCommits.length > 0) {
         setError(null);
       }
 
