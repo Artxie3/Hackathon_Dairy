@@ -217,70 +217,87 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Fetch recent events from GitHub API
-      const eventsResponse = await fetch(`https://api.github.com/users/${user.username}/events?per_page=50`, {
+      // First, get user's repositories
+      const reposResponse = await fetch(`https://api.github.com/user/repos?sort=updated&per_page=10`, {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: 'application/vnd.github.v3+json',
         },
       });
 
-      if (!eventsResponse.ok) {
-        throw new Error('Failed to fetch GitHub events');
+      if (!reposResponse.ok) {
+        throw new Error('Failed to fetch repositories');
       }
 
-      const events = await eventsResponse.json();
-      console.log('Fetched GitHub events:', events.length);
+      const repos = await reposResponse.json();
+      console.log('Fetched repositories:', repos.length);
 
-      // Filter push events (commits)
-      const pushEvents = events.filter((event: any) => event.type === 'PushEvent');
-      console.log('Found push events:', pushEvents.length);
-
-      let newDraftsCount = 0;
       let latestCommitTime = null;
       let latestCommitData = null;
 
-      // First pass: find the most recent commit across all repos
-      for (const event of pushEvents) {
-        const { payload, repo, created_at } = event;
-        const repoName = repo.name;
+      // Check commits from each repository
+      for (const repo of repos) {
+        const repoName = repo.full_name;
 
         // Check if this repository is excluded
         if (excludedRepos.includes(repoName)) {
+          console.log(`Skipping excluded repo: ${repoName}`);
           continue;
         }
 
-        const commits = payload.commits || [];
+        try {
+          // Get recent commits from this repository
+          const commitsResponse = await fetch(`https://api.github.com/repos/${repoName}/commits?per_page=10&author=${user.username}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: 'application/vnd.github.v3+json',
+            },
+          });
 
-        for (const commit of commits) {
-          // Use the actual commit timestamp, not the push event timestamp
-          const commitTime = commit.timestamp ? new Date(commit.timestamp) : new Date(created_at);
-          
-          console.log(`Checking commit: ${commit.sha.substring(0, 7)} - ${commit.message} - ${commitTime.toISOString()}`);
-          
-          // Check if we already have an entry or draft for this commit
-          const existingEntry = entries.find(entry => 
-            entry.commit_hash === commit.sha
-          );
-          const existingDraft = temporaryDrafts.find(draft => 
-            draft.commit_hash === commit.sha
-          );
-
-          if (!existingEntry && !existingDraft) {
-            console.log(`  -> Commit ${commit.sha.substring(0, 7)} is new and eligible`);
-            // Track the latest commit
-            if (!latestCommitTime || commitTime > latestCommitTime) {
-              console.log(`  -> This is now the latest commit (previous: ${latestCommitTime?.toISOString() || 'none'})`);
-              latestCommitTime = commitTime;
-              latestCommitData = {
-                commit,
-                repoName,
-                created_at: commit.timestamp || created_at // Use commit timestamp if available
-              };
-            }
-          } else {
-            console.log(`  -> Commit ${commit.sha.substring(0, 7)} already exists, skipping`);
+          if (!commitsResponse.ok) {
+            console.log(`Failed to fetch commits for ${repoName}`);
+            continue;
           }
+
+          const commits = await commitsResponse.json();
+          console.log(`Found ${commits.length} commits in ${repoName}`);
+
+          for (const commit of commits) {
+            // Use the commit date from the commit object
+            const commitTime = new Date(commit.commit.committer.date);
+            
+            console.log(`Checking commit: ${commit.sha.substring(0, 7)} - ${commit.commit.message.split('\n')[0]} - ${commitTime.toISOString()}`);
+            
+            // Check if we already have an entry or draft for this commit
+            const existingEntry = entries.find(entry => 
+              entry.commit_hash === commit.sha
+            );
+            const existingDraft = temporaryDrafts.find(draft => 
+              draft.commit_hash === commit.sha
+            );
+
+            if (!existingEntry && !existingDraft) {
+              console.log(`  -> Commit ${commit.sha.substring(0, 7)} is new and eligible`);
+              // Track the latest commit
+              if (!latestCommitTime || commitTime > latestCommitTime) {
+                console.log(`  -> This is now the latest commit (previous: ${latestCommitTime?.toISOString() || 'none'})`);
+                latestCommitTime = commitTime;
+                latestCommitData = {
+                  commit: {
+                    sha: commit.sha,
+                    message: commit.commit.message,
+                    timestamp: commit.commit.committer.date
+                  },
+                  repoName: repo.name, // Use short name, not full name
+                  created_at: commit.commit.committer.date
+                };
+              }
+            } else {
+              console.log(`  -> Commit ${commit.sha.substring(0, 7)} already exists, skipping`);
+            }
+          }
+        } catch (err) {
+          console.error(`Error fetching commits for ${repoName}:`, err);
         }
       }
 
@@ -308,13 +325,12 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
         };
 
         setTemporaryDrafts(prev => [temporaryDraft, ...prev]);
-        newDraftsCount = 1;
       }
 
       setLastSyncTime(new Date());
-      console.log(`Sync completed. ${newDraftsCount > 0 ? `Created temporary draft for latest commit (${newDraftsCount} draft total).` : 'No new commits found.'}`);
+      console.log(`Sync completed. ${latestCommitData ? `Created temporary draft for latest commit (1 draft total).` : 'No new commits found.'}`);
       
-      if (newDraftsCount > 0) {
+      if (latestCommitData) {
         setError(null);
       }
 
