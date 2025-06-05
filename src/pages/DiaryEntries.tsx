@@ -184,14 +184,13 @@ const DiaryEntries: React.FC = () => {
   };
 
   const getCommitUrl = (commitHash: string, repoName: string) => {
-    // Assuming GitHub format: https://github.com/owner/repo/commit/hash
-    // Extract owner from repo name if it includes owner/repo format
-    const parts = repoName.split('/');
-    if (parts.length === 2) {
-      return `https://github.com/${parts[0]}/${parts[1]}/commit/${commitHash}`;
+    // Always expect owner/repo format
+    const [owner, repo] = repoName.split('/');
+    if (!owner || !repo) {
+      // If repo name doesn't include owner, use the repo name as is
+      return `https://github.com/${repoName}/commit/${commitHash}`;
     }
-    // Fallback: just use repo name (might not work for all cases)
-    return `https://github.com/${repoName}/commit/${commitHash}`;
+    return `https://github.com/${owner}/${repo}/commit/${commitHash}`;
   };
 
   const handleImageClick = (images: string[], index: number, entryTitle: string) => {

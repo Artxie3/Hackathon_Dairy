@@ -170,12 +170,15 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
         const lines = message.split('\n');
         const commitMessage = lines[0] || '';
 
+        // Ensure repo name is in owner/repo format
+        const repoName = repo.includes('/') ? repo : `${user.username}/${repo}`;
+
         const temporaryDraft: TemporaryDraft = {
           id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           title: '', // Don't use commit message as title
           content: '', // Keep content empty for user to fill
           commit_hash: commitHash,
-          commit_repo: repo,
+          commit_repo: repoName,
           commit_message: commitMessage,
           created_at: new Date().toISOString(),
           tags: ['commit'], // Only add "commit" tag
@@ -288,7 +291,7 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
                     message: commit.commit.message,
                     timestamp: commit.commit.committer.date
                   },
-                  repoName: repo.name, // Use short name, not full name
+                  repoName: repoName, // Use full repository name (owner/repo format)
                   created_at: commit.commit.committer.date
                 };
               }
@@ -317,7 +320,7 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
           title: '', // Don't use commit message as title
           content: '', // Keep content empty for user to fill
           commit_hash: latestCommitData.commit.sha,
-          commit_repo: latestCommitData.repoName,
+          commit_repo: latestCommitData.repoName, // Keep using repoName from latestCommitData
           commit_message: commitMessage,
           created_at: latestCommitData.created_at,
           tags: ['commit'], // Only add "commit" tag
