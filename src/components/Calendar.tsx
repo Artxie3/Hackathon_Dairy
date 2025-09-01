@@ -321,7 +321,12 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
         
         <div className="flex gap-2">
           <button
-            onClick={() => handleAddNote(new Date())}
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleAddNote(new Date());
+            }}
             className="add-note-button"
             title="Add note for today"
           >
@@ -486,38 +491,38 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
         </div>
       </div>
 
-             {/* Calendar Note Modal */}
-       <CalendarNoteModal
-         isOpen={isNoteModalOpen}
-         onClose={() => {
-           setIsNoteModalOpen(false);
-           setEditingNote(null);
-           setSelectedDate(null);
-         }}
-         onSave={handleSaveNote}
-         onDelete={handleDeleteNote}
-         note={editingNote}
-         selectedDate={selectedDate || undefined}
-       />
+      {/* Calendar Note Modal */}
+      <CalendarNoteModal
+        isOpen={isNoteModalOpen}
+        onClose={() => {
+          setIsNoteModalOpen(false);
+          setEditingNote(null);
+          setSelectedDate(null);
+        }}
+        onSave={handleSaveNote}
+        onDelete={handleDeleteNote}
+        note={editingNote}
+        selectedDate={selectedDate || undefined}
+      />
 
-       {/* Notes Popup */}
-       {popupDate && (
-         <NotesPopup
-           isOpen={popupOpen}
-           onClose={() => {
-             setPopupOpen(false);
-             setPopupPosition(null);
-           }}
-           notes={calendarNotes.filter(note => {
-             const noteDate = new Date(note.note_date);
-             return noteDate.toDateString() === popupDate.toDateString();
-           })}
-           onEditNote={handleEditNoteFromPopup}
-           onAddNote={handleAddNoteFromPopup}
-           date={popupDate}
-           position={popupPosition || undefined}
-         />
-       )}
+      {/* Notes Popup */}
+      {popupDate && (
+        <NotesPopup
+          isOpen={popupOpen}
+          onClose={() => {
+            setPopupOpen(false);
+            setPopupPosition(null);
+          }}
+          notes={calendarNotes.filter(note => {
+            const noteDate = new Date(note.note_date);
+            return noteDate.toDateString() === popupDate.toDateString();
+          })}
+          onEditNote={handleEditNoteFromPopup}
+          onAddNote={handleAddNoteFromPopup}
+          date={popupDate}
+          position={popupPosition || undefined}
+        />
+      )}
     </div>
   );
 };

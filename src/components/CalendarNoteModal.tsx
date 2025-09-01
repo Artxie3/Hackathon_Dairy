@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Tag, AlertCircle, CheckCircle, Clock, Trash2 } from 'lucide-react';
+import { X, Calendar, Tag, AlertCircle, CheckCircle, Clock, Trash2, StickyNote, Plus } from 'lucide-react';
 import { CalendarNote } from '../utils/supabase';
 import '../styles/Calendar.css';
 
