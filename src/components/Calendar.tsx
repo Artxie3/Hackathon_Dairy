@@ -315,9 +315,7 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
             } ${
               day.isToday ? 'today' : ''
             } ${
-              day.hasEntries ? 'has-entries' : ''
-            } ${
-              day.hasHackathonEvents ? 'has-hackathon-events' : ''
+              (day.hasEntries || day.hasHackathonEvents) ? 'has-entries' : ''
             } ${
               day.isWeekend ? 'weekend' : ''
             }`}
@@ -329,26 +327,11 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
                {day.date.getDate()}
              </div>
              
-                           {/* Event titles */}
-              {day.hasHackathonEvents && (
-                <div className="event-title">
-                  {day.hackathonEvents.length === 1 
-                    ? day.hackathonEvents[0].title 
-                    : `${day.hackathonEvents[0].title} +${day.hackathonEvents.length - 1}`
-                  }
-                </div>
-              )}
+             
 
-              {/* Note titles */}
-              {day.hasCalendarNotes && (
-                <div 
-                  className={`note-title ${
-                    day.calendarNotes[0].priority === 'high' ? 'note-title-high' :
-                    day.calendarNotes[0].priority === 'medium' ? 'note-title-medium' :
-                    'note-title-low'
-                  }`}
-
-                >
+              {/* Note titles - only show for high priority notes */}
+              {day.hasCalendarNotes && day.calendarNotes[0].priority === 'high' && (
+                <div className="note-title note-title-high">
                   {day.calendarNotes.length === 1 
                     ? day.calendarNotes[0].title 
                     : `${day.calendarNotes[0].title} +${day.calendarNotes.length - 1}`
@@ -356,37 +339,38 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
                 </div>
               )}
             
-            {/* Entry indicators */}
-            {day.hasEntries && (
+            {/* Entry indicators - unified for both diary entries and hackathons */}
+            {(day.hasEntries || day.hasHackathonEvents) && (
               <div className="entry-indicators">
-                {day.entriesCount <= 3 ? (
-                  // Show individual dots for 1-3 entries
-                  Array.from({ length: day.entriesCount }).map((_, i) => (
-                    <div key={i} className="entry-dot" />
-                  ))
-                ) : (
-                  // Show count for 4+ entries
-                  <div className="entry-count">
-                    {day.entriesCount}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Hackathon event indicators */}
-            {day.hasHackathonEvents && (
-              <div className="hackathon-indicators">
-                {day.hackathonEvents.slice(0, 3).map((event, i) => (
-                  <div 
-                    key={i} 
-                    className={`hackathon-dot ${event.type}`}
-                    style={{ backgroundColor: event.color }}
-
-                  />
-                ))}
-                {day.hackathonEvents.length > 3 && (
-                  <div className="hackathon-more">+{day.hackathonEvents.length - 3}</div>
-                )}
+                {(() => {
+                  const totalItems = day.entriesCount + day.hackathonEvents.length;
+                  if (totalItems <= 3) {
+                    // Show individual dots for 1-3 items
+                    const dots = [];
+                    // Add diary entry dots
+                    for (let i = 0; i < day.entriesCount; i++) {
+                      dots.push(<div key={`entry-${i}`} className="entry-dot" />);
+                    }
+                    // Add hackathon dots
+                    for (let i = 0; i < day.hackathonEvents.length; i++) {
+                      dots.push(
+                        <div 
+                          key={`hackathon-${i}`} 
+                          className="entry-dot hackathon-dot"
+                          style={{ backgroundColor: day.hackathonEvents[i].color }}
+                        />
+                      );
+                    }
+                    return dots;
+                  } else {
+                    // Show count for 4+ items
+                    return (
+                      <div className="entry-count">
+                        {totalItems}
+                      </div>
+                    );
+                  }
+                })()}
               </div>
             )}
 
@@ -425,16 +409,8 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
           <span>Today</span>
         </div>
         <div className="legend-item">
-          <div className="legend-dot hackathon-start" style={{ backgroundColor: '#87ceeb' }}></div>
-          <span>Hackathon starts</span>
-        </div>
-        <div className="legend-item">
-          <div className="legend-dot hackathon-deadline" style={{ backgroundColor: '#ff00ff' }}></div>
-          <span>Submission deadline</span>
-        </div>
-        <div className="legend-item">
-          <div className="legend-dot hackathon-end" style={{ backgroundColor: '#ef4444' }}></div>
-          <span>Hackathon ends</span>
+          <div className="legend-dot has-entries" style={{ backgroundColor: '#22c55e' }}></div>
+          <span>Hackathons & Events</span>
         </div>
         <div className="legend-item">
           <div className="legend-dot note-indicator note medium" style={{ backgroundColor: '#3b82f6' }}></div>
