@@ -475,7 +475,7 @@
 /* Note Titles Display */
 .note-title {
   position: absolute;
-  top: 1.75rem;
+  top: 1.5rem;
   left: 0.25rem;
   right: 0.25rem;
   font-size: 0.5rem;
@@ -509,10 +509,35 @@
   background: var(--color-gray-600);
 }
 
+/* Note Title Priority Borders */
+.note-title-high {
+  border-left: 3px solid #ef4444 !important; /* red-500 */
+}
+
+.note-title-medium {
+  border-left: 3px solid #eab308 !important; /* yellow-500 */
+}
+
+.note-title-low {
+  border-left: 3px solid #22c55e !important; /* green-500 */
+}
+
+.dark-theme .note-title-high {
+  border-left-color: #f87171 !important; /* red-400 for dark theme */
+}
+
+.dark-theme .note-title-medium {
+  border-left-color: #facc15 !important; /* yellow-400 for dark theme */
+}
+
+.dark-theme .note-title-low {
+  border-left-color: #4ade80 !important; /* green-400 for dark theme */
+}
+
 /* Calendar Notes Indicators */
 .calendar-notes-indicators {
   position: absolute;
-  bottom: 0.25rem;
+  bottom: 0.5rem;
   right: 0.25rem;
   display: flex;
   gap: 0.125rem;

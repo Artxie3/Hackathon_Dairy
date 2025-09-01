@@ -343,7 +343,14 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
 
               {/* Note titles */}
               {day.hasCalendarNotes && (
-                <div className="note-title" title={day.calendarNotes.map(n => `${n.title} (${n.type})`).join(', ')}>
+                <div 
+                  className={`note-title ${
+                    day.calendarNotes[0].priority === 'high' ? 'note-title-high' :
+                    day.calendarNotes[0].priority === 'medium' ? 'note-title-medium' :
+                    'note-title-low'
+                  }`}
+                  title={day.calendarNotes.map(n => `${n.title} (${n.type})`).join(', ')}
+                >
                   {day.calendarNotes.length === 1 
                     ? day.calendarNotes[0].title 
                     : `${day.calendarNotes[0].title} +${day.calendarNotes.length - 1}`
