@@ -314,15 +314,25 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
                {day.date.getDate()}
              </div>
              
-             {/* Event titles */}
-             {day.hasHackathonEvents && (
-               <div className="event-title" title={day.hackathonEvents.map(e => `${e.title} (${e.type})`).join(', ')}>
-                 {day.hackathonEvents.length === 1 
-                   ? day.hackathonEvents[0].title 
-                   : `${day.hackathonEvents[0].title} +${day.hackathonEvents.length - 1}`
-                 }
-               </div>
-             )}
+                           {/* Event titles */}
+              {day.hasHackathonEvents && (
+                <div className="event-title" title={day.hackathonEvents.map(e => `${e.title} (${e.type})`).join(', ')}>
+                  {day.hackathonEvents.length === 1 
+                    ? day.hackathonEvents[0].title 
+                    : `${day.hackathonEvents[0].title} +${day.hackathonEvents.length - 1}`
+                  }
+                </div>
+              )}
+
+              {/* Note titles */}
+              {day.hasCalendarNotes && (
+                <div className="note-title" title={day.calendarNotes.map(n => `${n.title} (${n.type})`).join(', ')}>
+                  {day.calendarNotes.length === 1 
+                    ? day.calendarNotes[0].title 
+                    : `${day.calendarNotes[0].title} +${day.calendarNotes.length - 1}`
+                  }
+                </div>
+              )}
             
             {/* Entry indicators */}
             {day.hasEntries && (
@@ -418,18 +428,19 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
         </div>
       </div>
 
-      {/* Calendar Note Modal */}
-      <CalendarNoteModal
-        isOpen={isNoteModalOpen}
-        onClose={() => {
-          setIsNoteModalOpen(false);
-          setEditingNote(null);
-          setSelectedDate(null);
-        }}
-        onSave={handleSaveNote}
-        note={editingNote}
-        selectedDate={selectedDate || undefined}
-      />
+             {/* Calendar Note Modal */}
+       <CalendarNoteModal
+         isOpen={isNoteModalOpen}
+         onClose={() => {
+           setIsNoteModalOpen(false);
+           setEditingNote(null);
+           setSelectedDate(null);
+         }}
+         onSave={handleSaveNote}
+         onDelete={handleDeleteNote}
+         note={editingNote}
+         selectedDate={selectedDate || undefined}
+       />
     </div>
   );
 };

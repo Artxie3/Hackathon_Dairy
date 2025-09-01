@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Tag, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { X, Calendar, Tag, AlertCircle, CheckCircle, Clock, Trash2 } from 'lucide-react';
 import { CalendarNote } from '../utils/supabase';
 import '../styles/Calendar.css';
 
@@ -7,6 +7,7 @@ interface CalendarNoteModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (note: Partial<CalendarNote>) => Promise<void>;
+  onDelete?: (noteId: string) => Promise<void>;
   note?: CalendarNote | null;
   selectedDate?: Date;
 }
@@ -15,6 +16,7 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
   isOpen,
   onClose,
   onSave,
+  onDelete,
   note,
   selectedDate
 }) => {
@@ -25,6 +27,7 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
 
   useEffect(() => {
@@ -88,6 +91,26 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
     if (e.key === 'Enter') {
       e.preventDefault();
       addTag();
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!note?.id || !onDelete) return;
+
+    if (!window.confirm('Are you sure you want to delete this note? This action cannot be undone.')) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setErrors([]);
+
+    try {
+      await onDelete(note.id);
+      onClose();
+    } catch (error) {
+      setErrors(['Failed to delete note. Please try again.']);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -248,31 +271,56 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
           )}
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {isSaving ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <CheckCircle size={16} />
-                  {note ? 'Update' : 'Save'}
-                </>
-              )}
-            </button>
+          <div className="flex justify-between pt-4">
+            {/* Delete button (only for existing notes) */}
+            {note && onDelete && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting || isSaving}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isDeleting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={16} />
+                    Delete
+                  </>
+                )}
+              </button>
+            )}
+            
+            {/* Save/Cancel buttons */}
+            <div className="flex gap-3 ml-auto">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSaving || isDeleting}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={16} />
+                    {note ? 'Update' : 'Save'}
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </form>
       </div>

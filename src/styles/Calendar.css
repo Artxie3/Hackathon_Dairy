@@ -178,6 +178,16 @@
   margin-top: 1.5rem; /* Add space for event titles */
 }
 
+/* Adjust day number when there are notes */
+.calendar-day.has-calendar-notes .day-number {
+  margin-top: 2.5rem; /* Add space for note titles */
+}
+
+/* Adjust day number when there are both events and notes */
+.calendar-day.has-hackathon-events.has-calendar-notes .day-number {
+  margin-top: 2.5rem; /* Add space for both event and note titles */
+}
+
 .dark-theme .day-number {
   color: var(--color-gray-100);
 }
@@ -462,6 +472,40 @@
   background: rgba(0, 0, 0, 0.95);
 }
 
+/* Note Titles Display */
+.note-title {
+  position: absolute;
+  top: 1.75rem;
+  left: 0.25rem;
+  right: 0.25rem;
+  font-size: 0.5rem;
+  font-weight: 500;
+  color: white;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 0.0625rem 0.125rem;
+  border-radius: 0.125rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 2;
+  max-width: calc(100% - 0.5rem);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.note-title:hover {
+  background: rgba(0, 0, 0, 0.8);
+  transform: scale(1.02);
+}
+
+.dark-theme .note-title {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.dark-theme .note-title:hover {
+  background: rgba(0, 0, 0, 0.9);
+}
+
 /* Calendar Notes Indicators */
 .calendar-notes-indicators {
   position: absolute;
@@ -615,6 +659,14 @@
 
   .calendar-day.has-hackathon-events .day-number {
     margin-top: 1rem;
+  }
+
+  .calendar-day.has-calendar-notes .day-number {
+    margin-top: 1.5rem;
+  }
+
+  .calendar-day.has-hackathon-events.has-calendar-notes .day-number {
+    margin-top: 1.5rem;
   }
 }
 
