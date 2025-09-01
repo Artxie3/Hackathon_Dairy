@@ -133,21 +133,6 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
     }
   };
 
-  const handleDeleteNoteFromList = async (noteId: string) => {
-    if (!onDelete) return;
-
-    if (!window.confirm('Are you sure you want to delete this note? This action cannot be undone.')) {
-      return;
-    }
-
-    try {
-      await onDelete(noteId);
-    } catch (error) {
-      console.error('Error deleting note:', error);
-      alert('Failed to delete note. Please try again.');
-    }
-  };
-
   const handleEditNote = (noteToEdit: CalendarNote) => {
     setEditingNote(noteToEdit);
     setTitle(noteToEdit.title);
@@ -169,6 +154,21 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
     setTags([]);
     if (onModeChange) {
       onModeChange('create');
+    }
+  };
+
+  const handleDeleteNoteFromList = async (noteId: string) => {
+    if (!onDelete) return;
+
+    if (!window.confirm('Are you sure you want to delete this note? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await onDelete(noteId);
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      alert('Failed to delete note. Please try again.');
     }
   };
 
@@ -194,7 +194,7 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-[400px] max-w-[95vw] max-h-[90vh] overflow-hidden border border-gray-200/20 dark:border-gray-700/30">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-[400px] max-w-[95vw] max-h-[90vh] overflow-hidden border border-gray-200/20 dark:border-gray-700/30" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}>
         {/* Header */}
         <div className="relative bg-gradient-to-r from-blue-500 to-purple-600 p-6 text-white">
           <div className="flex items-center justify-between">
@@ -208,19 +208,19 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
                   <Plus size={20} className="text-white" />
                 )}
               </div>
-              <div>
-                <h3 className="text-xl font-bold">
-                  {selectedDate?.toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
-                </h3>
-                <p className="text-blue-100 text-sm">
-                  {mode === 'list' ? 'Notes & Tasks' : 
-                   mode === 'edit' ? 'Edit Note' : 'Create Note'}
-                </p>
-              </div>
+                             <div>
+                 <h3 className="text-xl font-bold">
+                   {selectedDate?.toLocaleDateString('en-US', {
+                     weekday: 'long',
+                     month: 'long',
+                     day: 'numeric'
+                   })}
+                 </h3>
+                 <p className="text-blue-100 text-sm">
+                   {mode === 'list' ? 'Notes & Tasks' : 
+                    mode === 'edit' ? 'Edit Note' : 'Create Note'}
+                 </p>
+               </div>
             </div>
             <button
               onClick={onClose}
@@ -242,67 +242,71 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
                   {notes.map(noteItem => (
                     <div
                       key={noteItem.id}
-                      className={`p-4 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-blue-500 dark:hover:border-blue-400 transition-all duration-200 ${
+                      className={`p-4 border-2 border-gray-200 dark:border-gray-700 rounded-xl cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition-all duration-200 ${
                         noteItem.is_completed ? 'opacity-60' : ''
                       }`}
+                      onClick={() => handleEditNote(noteItem)}
                     >
-                      <div className="flex items-start gap-3">
-                        <div 
-                          className="w-8 h-8 rounded-lg flex items-center justify-center text-white"
-                          style={{ backgroundColor: getNoteColor(noteItem.note_type) }}
-                        >
-                          {getNoteIcon(noteItem.note_type)}
-                        </div>
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-gray-900 dark:text-white">
-                            {noteItem.title}
-                          </h4>
-                          {noteItem.content && (
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                              {noteItem.content}
-                            </p>
-                          )}
-                          <div className="flex items-center gap-2 mt-2">
-                            <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-gray-600 dark:text-gray-400">
-                              {noteItem.note_type}
-                            </span>
-                            <span className={`text-xs px-2 py-1 rounded-full ${
-                              noteItem.priority === 'high' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
-                              noteItem.priority === 'medium' ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                              'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
-                            }`}>
-                              {noteItem.priority}
-                            </span>
-                            {noteItem.is_completed && (
-                              <span className="text-xs px-2 py-1 bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 rounded-full">
-                                Completed
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleEditNote(noteItem)}
-                            className="p-2 text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-all duration-200"
-                            title="Edit note"
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                              <path d="m18.5 2.5 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                            </svg>
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteNoteFromList(noteItem.id);
-                            }}
-                            className="p-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
-                            title="Delete note"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </div>
+                                             <div className="flex items-start gap-3">
+                         <div 
+                           className="w-8 h-8 rounded-lg flex items-center justify-center text-white"
+                           style={{ backgroundColor: getNoteColor(noteItem.note_type) }}
+                         >
+                           {getNoteIcon(noteItem.note_type)}
+                         </div>
+                         <div className="flex-1">
+                           <h4 className="font-semibold text-gray-900 dark:text-white">
+                             {noteItem.title}
+                           </h4>
+                           {noteItem.content && (
+                             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                               {noteItem.content}
+                             </p>
+                           )}
+                           <div className="flex items-center gap-2 mt-2">
+                             <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-gray-600 dark:text-gray-400">
+                               {noteItem.note_type}
+                             </span>
+                             <span className={`text-xs px-2 py-1 rounded-full ${
+                               noteItem.priority === 'high' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
+                               noteItem.priority === 'medium' ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                               'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
+                             }`}>
+                               {noteItem.priority}
+                             </span>
+                             {noteItem.is_completed && (
+                               <span className="text-xs px-2 py-1 bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 rounded-full">
+                                 Completed
+                               </span>
+                             )}
+                           </div>
+                         </div>
+                         <div className="flex gap-2">
+                           <button
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               handleEditNote(noteItem);
+                             }}
+                             className="p-2 text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-all duration-200"
+                             title="Edit note"
+                           >
+                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                               <path d="m18.5 2.5 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                             </svg>
+                           </button>
+                           <button
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               handleDeleteNoteFromList(noteItem.id);
+                             }}
+                             className="p-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
+                             title="Delete note"
+                           >
+                             <Trash2 size={16} />
+                           </button>
+                         </div>
+                       </div>
                     </div>
                   ))}
                 </div>
