@@ -310,9 +310,19 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
               `${day.hasEntries ? `${day.entriesCount} ${day.entriesCount === 1 ? 'entry' : 'entries'}` : ''}${day.hasEntries && day.hasHackathonEvents ? ', ' : ''}${day.hasHackathonEvents ? day.hackathonEvents.map(e => `${e.title} (${e.type})`).join(', ') : ''}${day.hasCalendarNotes ? `, ${day.calendarNotes.length} ${day.calendarNotes.length === 1 ? 'note' : 'notes'}` : ''} - ${day.date.toLocaleDateString()}\n\nDouble-click to add a note`
             }
           >
-            <div className="day-number">
-              {day.date.getDate()}
-            </div>
+                         <div className="day-number">
+               {day.date.getDate()}
+             </div>
+             
+             {/* Event titles */}
+             {day.hasHackathonEvents && (
+               <div className="event-title" title={day.hackathonEvents.map(e => `${e.title} (${e.type})`).join(', ')}>
+                 {day.hackathonEvents.length === 1 
+                   ? day.hackathonEvents[0].title 
+                   : `${day.hackathonEvents[0].title} +${day.hackathonEvents.length - 1}`
+                 }
+               </div>
+             )}
             
             {/* Entry indicators */}
             {day.hasEntries && (
@@ -395,15 +405,15 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
           <span>Hackathon ends</span>
         </div>
         <div className="legend-item">
-          <div className="legend-dot note-indicator note medium"></div>
+          <div className="legend-dot note-indicator note medium" style={{ backgroundColor: '#3b82f6' }}></div>
           <span>Notes</span>
         </div>
         <div className="legend-item">
-          <div className="legend-dot note-indicator task medium"></div>
+          <div className="legend-dot note-indicator task medium" style={{ backgroundColor: '#8b5cf6' }}></div>
           <span>Tasks</span>
         </div>
         <div className="legend-item">
-          <div className="legend-dot note-indicator reminder medium"></div>
+          <div className="legend-dot note-indicator reminder medium" style={{ backgroundColor: '#fbbf24' }}></div>
           <span>Reminders</span>
         </div>
       </div>
