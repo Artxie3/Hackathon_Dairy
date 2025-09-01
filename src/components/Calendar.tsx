@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Plus, StickyNote, CheckSquare, Bell } from 'lucide-react';
 import { useDiary } from '../contexts/DiaryContext';
 import { useHackathons } from '../contexts/HackathonContext';
 import CalendarNoteModal from './CalendarNoteModal';
+import NotesPopup from './NotesPopup';
 
 interface CalendarProps {
   onDateClick?: (date: Date) => void;
@@ -39,6 +40,9 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [editingNote, setEditingNote] = useState<any>(null);
+  const [popupOpen, setPopupOpen] = useState(false);
+  const [popupDate, setPopupDate] = useState<Date | null>(null);
+  const calendarRef = useRef<HTMLDivElement>(null);
 
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const months = [
@@ -193,11 +197,7 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
     setCurrentDate(new Date());
   };
 
-  const handleDateClick = (day: CalendarDay) => {
-    if (onDateClick) {
-      onDateClick(day.date);
-    }
-  };
+
 
   const handleAddNote = (date: Date) => {
     setSelectedDate(date);
@@ -235,8 +235,50 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
     }
   };
 
+  const handleDayClick = (day: CalendarDay, event: React.MouseEvent) => {
+    // Check if clicking on a note indicator
+    const target = event.target as HTMLElement;
+    if (target.closest('.note-indicator') || target.closest('.calendar-notes-indicators')) {
+      return; // Let the note indicator handle the click
+    }
+
+    // If the day has notes, show popup
+    if (day.hasCalendarNotes) {
+      setPopupDate(day.date);
+      setPopupOpen(true);
+    } else if (onDateClick) {
+      onDateClick(day.date);
+    }
+  };
+
+  const handleEditNoteFromPopup = (note: any) => {
+    setEditingNote(note);
+    setSelectedDate(new Date(note.note_date));
+    setIsNoteModalOpen(true);
+  };
+
+  const handleAddNoteFromPopup = (date: Date) => {
+    setSelectedDate(date);
+    setEditingNote(null);
+    setIsNoteModalOpen(true);
+  };
+
+  // Close popup when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
+        setPopupOpen(false);
+      }
+    };
+
+    if (popupOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [popupOpen]);
+
   return (
-    <div className={`calendar-container ${className}`}>
+    <div ref={calendarRef} className={`calendar-container ${className}`}>
       {/* Calendar Header */}
       <div className="calendar-header">
         <div className="calendar-navigation">
@@ -304,8 +346,8 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
             } ${
               day.isWeekend ? 'weekend' : ''
             }`}
-            onClick={() => handleDateClick(day)}
-            onDoubleClick={() => handleAddNote(day.date)}
+                         onClick={(e) => handleDayClick(day, e)}
+             onDoubleClick={() => handleAddNote(day.date)}
             title={
               `${day.hasEntries ? `${day.entriesCount} ${day.entriesCount === 1 ? 'entry' : 'entries'}` : ''}${day.hasEntries && day.hasHackathonEvents ? ', ' : ''}${day.hasHackathonEvents ? day.hackathonEvents.map(e => `${e.title} (${e.type})`).join(', ') : ''}${day.hasCalendarNotes ? `, ${day.calendarNotes.length} ${day.calendarNotes.length === 1 ? 'note' : 'notes'}` : ''} - ${day.date.toLocaleDateString()}\n\nDouble-click to add a note`
             }
@@ -441,6 +483,21 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
          note={editingNote}
          selectedDate={selectedDate || undefined}
        />
+
+       {/* Notes Popup */}
+       {popupDate && (
+         <NotesPopup
+           isOpen={popupOpen}
+           onClose={() => setPopupOpen(false)}
+           notes={calendarNotes.filter(note => {
+             const noteDate = new Date(note.note_date);
+             return noteDate.toDateString() === popupDate.toDateString();
+           })}
+           onEditNote={handleEditNoteFromPopup}
+           onAddNote={handleAddNoteFromPopup}
+           date={popupDate}
+         />
+       )}
     </div>
   );
 };
