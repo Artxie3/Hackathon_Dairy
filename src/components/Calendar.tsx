@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Plus, StickyNote, CheckSquare, Bell } from 'lucide-react';
+import { ChevronLeft, ChevronRight, StickyNote, CheckSquare, Bell } from 'lucide-react';
 import { useDiary } from '../contexts/DiaryContext';
 import { useHackathons } from '../contexts/HackathonContext';
 import CalendarNoteModal from './CalendarNoteModal';
@@ -283,19 +283,6 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
         
         <div className="flex gap-2">
           <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              handleAddNote(new Date());
-            }}
-            className="add-note-button"
-            title="Add note for today"
-          >
-            <Plus size={16} />
-            Add Note
-          </button>
-          <button
             onClick={goToToday}
             className="today-button"
           >
@@ -471,6 +458,7 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
           return noteDate.toDateString() === selectedDate.toDateString();
         }) : []}
         mode={modalMode}
+        onModeChange={setModalMode}
       />
 
 

@@ -12,6 +12,7 @@ interface CalendarNoteModalProps {
   selectedDate?: Date;
   notes?: CalendarNote[];
   mode?: 'create' | 'edit' | 'list';
+  onModeChange?: (mode: 'create' | 'edit' | 'list') => void;
 }
 
 const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
@@ -22,7 +23,8 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
   note,
   selectedDate,
   notes = [],
-  mode = 'create'
+  mode = 'create',
+  onModeChange
 }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -136,6 +138,9 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
     setNoteType(noteToEdit.note_type);
     setPriority(noteToEdit.priority);
     setTags(noteToEdit.tags || []);
+    if (onModeChange) {
+      onModeChange('edit');
+    }
   };
 
   const handleAddNewNote = () => {
@@ -145,6 +150,9 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
     setNoteType('note');
     setPriority('medium');
     setTags([]);
+    if (onModeChange) {
+      onModeChange('create');
+    }
   };
 
   const getNoteIcon = (type: string) => {
@@ -175,7 +183,9 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                {note ? (
+                {mode === 'list' ? (
+                  <StickyNote size={20} className="text-white" />
+                ) : mode === 'edit' ? (
                   <StickyNote size={20} className="text-white" />
                 ) : (
                   <Plus size={20} className="text-white" />
@@ -183,7 +193,8 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
               </div>
               <div>
                 <h3 className="text-xl font-bold">
-                  {note ? 'Edit Note' : 'Create Note'}
+                  {mode === 'list' ? 'Notes & Tasks' : 
+                   mode === 'edit' ? 'Edit Note' : 'Create Note'}
                 </h3>
                 <p className="text-blue-100 text-sm">
                   {selectedDate?.toLocaleDateString('en-US', {
