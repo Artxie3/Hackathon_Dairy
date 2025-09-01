@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, StickyNote, CheckSquare, Bell } from 'lucide-react';
 import { useDiary } from '../contexts/DiaryContext';
 import { useHackathons } from '../contexts/HackathonContext';
+import CalendarNoteModal from './CalendarNoteModal';
 
 interface CalendarProps {
   onDateClick?: (date: Date) => void;
@@ -21,12 +22,23 @@ interface CalendarDay {
     title: string;
     color: string;
   }>;
+  hasCalendarNotes: boolean;
+  calendarNotes: Array<{
+    id: string;
+    title: string;
+    type: 'note' | 'task' | 'reminder';
+    priority: 'low' | 'medium' | 'high';
+    isCompleted: boolean;
+  }>;
 }
 
 const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
-  const { entries, temporaryDrafts } = useDiary();
+  const { entries, temporaryDrafts, calendarNotes, createCalendarNote, updateCalendarNote, deleteCalendarNote } = useDiary();
   const { hackathons } = useHackathons();
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [editingNote, setEditingNote] = useState<any>(null);
 
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const months = [
@@ -113,12 +125,38 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
       });
     });
     
+    // Create calendar notes map for quick lookup
+    const calendarNotesMap = new Map<string, Array<{
+      id: string;
+      title: string;
+      type: 'note' | 'task' | 'reminder';
+      priority: 'low' | 'medium' | 'high';
+      isCompleted: boolean;
+    }>>();
+    
+    // Map calendar notes by date
+    calendarNotes.forEach(note => {
+      const noteDate = new Date(note.note_date);
+      const dateKey = noteDate.toDateString();
+      if (!calendarNotesMap.has(dateKey)) {
+        calendarNotesMap.set(dateKey, []);
+      }
+      calendarNotesMap.get(dateKey)!.push({
+        id: note.id,
+        title: note.title,
+        type: note.note_type,
+        priority: note.priority,
+        isCompleted: note.is_completed,
+      });
+    });
+
     // Generate all days for the calendar grid
     const current = new Date(startDate);
     while (current <= endDate) {
       const dateKey = current.toDateString();
       const entriesCount = entriesMap.get(dateKey) || 0;
       const hackathonEvents = hackathonEventsMap.get(dateKey) || [];
+      const dayNotes = calendarNotesMap.get(dateKey) || [];
       
       days.push({
         date: new Date(current),
@@ -129,13 +167,15 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
         isWeekend: current.getDay() === 0 || current.getDay() === 6,
         hasHackathonEvents: hackathonEvents.length > 0,
         hackathonEvents,
+        hasCalendarNotes: dayNotes.length > 0,
+        calendarNotes: dayNotes,
       });
       
       current.setDate(current.getDate() + 1);
     }
     
     return days;
-  }, [currentDate, entries, temporaryDrafts, hackathons]);
+  }, [currentDate, entries, temporaryDrafts, hackathons, calendarNotes]);
 
   const navigateMonth = (direction: 'prev' | 'next') => {
     setCurrentDate(prev => {
@@ -156,6 +196,42 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
   const handleDateClick = (day: CalendarDay) => {
     if (onDateClick) {
       onDateClick(day.date);
+    }
+  };
+
+  const handleAddNote = (date: Date) => {
+    setSelectedDate(date);
+    setEditingNote(null);
+    setIsNoteModalOpen(true);
+  };
+
+  const handleEditNote = (note: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingNote(note);
+    setSelectedDate(new Date(note.note_date));
+    setIsNoteModalOpen(true);
+  };
+
+  const handleSaveNote = async (noteData: any) => {
+    try {
+      if (editingNote) {
+        await updateCalendarNote(editingNote.id, noteData);
+      } else {
+        await createCalendarNote(noteData);
+      }
+      setIsNoteModalOpen(false);
+      setEditingNote(null);
+      setSelectedDate(null);
+    } catch (error) {
+      console.error('Error saving note:', error);
+    }
+  };
+
+  const handleDeleteNote = async (noteId: string) => {
+    try {
+      await deleteCalendarNote(noteId);
+    } catch (error) {
+      console.error('Error deleting note:', error);
     }
   };
 
@@ -185,12 +261,22 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
           </button>
         </div>
         
-        <button
-          onClick={goToToday}
-          className="today-button"
-        >
-          Today
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleAddNote(new Date())}
+            className="add-note-button"
+            title="Add note for today"
+          >
+            <Plus size={16} />
+            Add Note
+          </button>
+          <button
+            onClick={goToToday}
+            className="today-button"
+          >
+            Today
+          </button>
+        </div>
       </div>
 
       {/* Days of Week Header */}
@@ -219,10 +305,9 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
               day.isWeekend ? 'weekend' : ''
             }`}
             onClick={() => handleDateClick(day)}
+            onDoubleClick={() => handleAddNote(day.date)}
             title={
-              day.hasEntries || day.hasHackathonEvents
-                ? `${day.hasEntries ? `${day.entriesCount} ${day.entriesCount === 1 ? 'entry' : 'entries'}` : ''}${day.hasEntries && day.hasHackathonEvents ? ', ' : ''}${day.hasHackathonEvents ? day.hackathonEvents.map(e => `${e.title} (${e.type})`).join(', ') : ''} - ${day.date.toLocaleDateString()}`
-                : day.date.toLocaleDateString()
+              `${day.hasEntries ? `${day.entriesCount} ${day.entriesCount === 1 ? 'entry' : 'entries'}` : ''}${day.hasEntries && day.hasHackathonEvents ? ', ' : ''}${day.hasHackathonEvents ? day.hackathonEvents.map(e => `${e.title} (${e.type})`).join(', ') : ''}${day.hasCalendarNotes ? `, ${day.calendarNotes.length} ${day.calendarNotes.length === 1 ? 'note' : 'notes'}` : ''} - ${day.date.toLocaleDateString()}\n\nDouble-click to add a note`
             }
           >
             <div className="day-number">
@@ -262,6 +347,27 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
                 )}
               </div>
             )}
+
+            {/* Calendar notes indicators */}
+            {day.hasCalendarNotes && (
+              <div className="calendar-notes-indicators">
+                {day.calendarNotes.slice(0, 3).map((note, i) => (
+                  <div 
+                    key={i} 
+                    className={`note-indicator ${note.type} ${note.priority} ${note.isCompleted ? 'completed' : ''}`}
+                    title={`${note.title} (${note.type}, ${note.priority} priority)${note.isCompleted ? ' - Completed' : ''}`}
+                    onClick={(e) => handleEditNote(note, e)}
+                  >
+                    {note.type === 'note' && <StickyNote size={12} />}
+                    {note.type === 'task' && <CheckSquare size={12} />}
+                    {note.type === 'reminder' && <Bell size={12} />}
+                  </div>
+                ))}
+                {day.calendarNotes.length > 3 && (
+                  <div className="notes-more">+{day.calendarNotes.length - 3}</div>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -288,7 +394,32 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
           <div className="legend-dot hackathon-end" style={{ backgroundColor: '#ef4444' }}></div>
           <span>Hackathon ends</span>
         </div>
+        <div className="legend-item">
+          <div className="legend-dot note-indicator note medium"></div>
+          <span>Notes</span>
+        </div>
+        <div className="legend-item">
+          <div className="legend-dot note-indicator task medium"></div>
+          <span>Tasks</span>
+        </div>
+        <div className="legend-item">
+          <div className="legend-dot note-indicator reminder medium"></div>
+          <span>Reminders</span>
+        </div>
       </div>
+
+      {/* Calendar Note Modal */}
+      <CalendarNoteModal
+        isOpen={isNoteModalOpen}
+        onClose={() => {
+          setIsNoteModalOpen(false);
+          setEditingNote(null);
+          setSelectedDate(null);
+        }}
+        onSave={handleSaveNote}
+        note={editingNote}
+        selectedDate={selectedDate || undefined}
+      />
     </div>
   );
 };

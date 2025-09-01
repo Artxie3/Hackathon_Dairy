@@ -4,6 +4,7 @@ import { useDiary } from '../contexts/DiaryContext';
 import { EntryEditor } from '../components/EntryEditor';
 import { AudioPlayer } from '../components/AudioPlayer';
 import { ImageViewer } from '../components/ImageViewer';
+import Calendar from '../components/Calendar';
 import { DiaryEntry } from '../utils/supabase';
 import '../styles/DiaryEntries.css';
 
@@ -273,6 +274,12 @@ const DiaryEntries: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* Calendar */}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Calendar</h2>
+        <Calendar className="w-full" />
+      </div>
 
       {/* Tabs */}
       <div className="tabs">

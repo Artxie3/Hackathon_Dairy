@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
-import { DiaryEntry, diaryEntries } from '../utils/supabase';
+import { DiaryEntry, CalendarNote, diaryEntries, calendarNotes } from '../utils/supabase';
 
 interface TemporaryDraft {
   id: string;
@@ -17,11 +17,15 @@ interface TemporaryDraft {
 interface DiaryContextType {
   entries: DiaryEntry[];
   temporaryDrafts: TemporaryDraft[];
+  calendarNotes: CalendarNote[];
   loading: boolean;
   error: string | null;
   createEntry: (entry: Partial<DiaryEntry>) => Promise<DiaryEntry>;
   updateEntry: (id: string, updates: Partial<DiaryEntry>) => Promise<DiaryEntry>;
   deleteEntry: (id: string) => Promise<void>;
+  createCalendarNote: (note: Partial<CalendarNote>) => Promise<CalendarNote>;
+  updateCalendarNote: (id: string, updates: Partial<CalendarNote>) => Promise<CalendarNote>;
+  deleteCalendarNote: (id: string) => Promise<void>;
   handleCommitEvent: (commitHash: string, repo: string, message: string) => Promise<void>;
   syncGitHubCommits: () => Promise<void>;
   isSyncing: boolean;
@@ -36,29 +40,34 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [temporaryDrafts, setTemporaryDrafts] = useState<TemporaryDraft[]>([]);
+  const [calendarNotesList, setCalendarNotesList] = useState<CalendarNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
 
-  // Load user's entries
+  // Load user's entries and calendar notes
   useEffect(() => {
     if (!user?.username) return;
 
-    const loadEntries = async () => {
+    const loadData = async () => {
       try {
         setLoading(true);
-        const data = await diaryEntries.getByUser(user.username);
-        setEntries(data);
+        const [entriesData, notesData] = await Promise.all([
+          diaryEntries.getByUser(user.username),
+          calendarNotes.getByUser(user.username)
+        ]);
+        setEntries(entriesData);
+        setCalendarNotesList(notesData);
       } catch (err) {
-        console.error('Error loading entries:', err);
-        setError('Failed to load diary entries');
+        console.error('Error loading data:', err);
+        setError('Failed to load data');
       } finally {
         setLoading(false);
       }
     };
 
-    loadEntries();
+    loadData();
   }, [user?.username]);
 
   // Auto-sync GitHub commits on load and periodically
@@ -126,6 +135,38 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
   const deleteEntry = async (id: string) => {
     await diaryEntries.delete(id);
     setEntries(prev => prev.filter(entry => entry.id !== id));
+  };
+
+  const createCalendarNote = async (note: Partial<CalendarNote>) => {
+    if (!user?.username) throw new Error('User not authenticated');
+
+    const newNote = await calendarNotes.create({
+      ...note,
+      user_id: user.username,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+    setCalendarNotesList(prev => [newNote, ...prev]);
+    return newNote;
+  };
+
+  const updateCalendarNote = async (id: string, updates: Partial<CalendarNote>) => {
+    const updatedNote = await calendarNotes.update(id, {
+      ...updates,
+      updated_at: new Date().toISOString(),
+    });
+
+    setCalendarNotesList(prev => prev.map(note => 
+      note.id === id ? updatedNote : note
+    ));
+
+    return updatedNote;
+  };
+
+  const deleteCalendarNote = async (id: string) => {
+    await calendarNotes.delete(id);
+    setCalendarNotesList(prev => prev.filter(note => note.id !== id));
   };
 
   const convertTemporaryDraft = async (draftId: string): Promise<DiaryEntry> => {
@@ -349,11 +390,15 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
     <DiaryContext.Provider value={{
       entries,
       temporaryDrafts,
+      calendarNotes: calendarNotesList,
       loading,
       error,
       createEntry,
       updateEntry,
       deleteEntry,
+      createCalendarNote,
+      updateCalendarNote,
+      deleteCalendarNote,
       handleCommitEvent,
       syncGitHubCommits,
       isSyncing,

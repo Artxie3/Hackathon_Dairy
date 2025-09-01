@@ -109,6 +109,20 @@ export interface DiaryEntry {
   tags: string[];
 }
 
+export interface CalendarNote {
+  id: string;
+  user_id: string;
+  title: string;
+  content?: string;
+  note_date: string;
+  note_type: 'note' | 'task' | 'reminder';
+  priority: 'low' | 'medium' | 'high';
+  is_completed: boolean;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface HackathonEntry {
   id: string;
   user_id: string;
@@ -173,6 +187,65 @@ export const diaryEntries = {
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data;
+  },
+};
+
+// Helper functions for calendar notes
+export const calendarNotes = {
+  async create(note: Partial<CalendarNote>) {
+    const { data, error } = await supabase
+      .from('calendar_notes')
+      .insert(note)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id: string, updates: Partial<CalendarNote>) {
+    const { data, error } = await supabase
+      .from('calendar_notes')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async delete(id: string) {
+    const { error } = await supabase
+      .from('calendar_notes')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  },
+
+  async getByUser(userId: string) {
+    const { data, error } = await supabase
+      .from('calendar_notes')
+      .select('*')
+      .eq('user_id', userId)
+      .order('note_date', { ascending: false });
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async getByDateRange(userId: string, startDate: string, endDate: string) {
+    const { data, error } = await supabase
+      .from('calendar_notes')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('note_date', startDate)
+      .lte('note_date', endDate)
+      .order('note_date', { ascending: true });
     
     if (error) throw error;
     return data;
