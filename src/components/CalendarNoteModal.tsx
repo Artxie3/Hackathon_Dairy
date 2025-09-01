@@ -155,7 +155,7 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* Title */}
           <div className="space-y-2">
             <label htmlFor="title" className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
@@ -181,7 +181,7 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
               id="content"
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              rows={4}
+              rows={3}
               className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white transition-all duration-200 resize-none"
               placeholder="Add details, thoughts, or reminders..."
             />
@@ -281,14 +281,14 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
           )}
 
           {/* Actions */}
-          <div className="flex justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
             {/* Delete button (only for existing notes) */}
             {note && onDelete && (
               <button
                 type="button"
                 onClick={handleDelete}
                 disabled={isDeleting || isSaving}
-                className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium shadow-lg"
+                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium shadow-lg"
               >
                 {isDeleting ? (
                   <>
@@ -309,14 +309,14 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-6 py-3 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all duration-200 font-medium"
+                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all duration-200 font-medium"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSaving || isDeleting}
-                className="px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium shadow-lg"
+                className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium shadow-lg"
               >
                 {isSaving ? (
                   <>
