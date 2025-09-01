@@ -671,6 +671,11 @@
   .calendar-day.has-hackathon-events.has-calendar-notes .day-number {
     margin-top: 1.5rem;
   }
+
+  .notes-popup {
+    width: 240px;
+    max-width: 85vw;
+  }
 }
 
 /* Notes Popup */
@@ -681,9 +686,10 @@
   border-radius: 0.5rem;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
   z-index: 1000;
-  min-width: 200px;
-  max-width: 300px;
+  width: 280px;
+  max-width: 90vw;
   padding: 0.75rem;
+  transform: translateX(-50%);
 }
 
 .dark-theme .notes-popup {

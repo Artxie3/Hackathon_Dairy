@@ -220,6 +220,7 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
       } else {
         await createCalendarNote(noteData);
       }
+      // Close modal and reset state
       setIsNoteModalOpen(false);
       setEditingNote(null);
       setSelectedDate(null);
@@ -246,9 +247,17 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
     // If the day has notes, show popup
     if (day.hasCalendarNotes) {
       const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const bottomY = rect.bottom + 10;
+      
+      // Ensure popup stays within viewport
+      const popupWidth = 280;
+      const viewportWidth = window.innerWidth;
+      const adjustedX = Math.max(popupWidth / 2, Math.min(centerX, viewportWidth - popupWidth / 2));
+      
       setPopupPosition({
-        x: rect.left + rect.width / 2,
-        y: rect.bottom + 10
+        x: adjustedX,
+        y: bottomY
       });
       setPopupDate(day.date);
       setPopupOpen(true);

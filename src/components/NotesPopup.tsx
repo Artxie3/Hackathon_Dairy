@@ -61,8 +61,7 @@ const NotesPopup: React.FC<NotesPopupProps> = ({
 
   const popupStyle = position ? {
     left: `${position.x}px`,
-    top: `${position.y}px`,
-    transform: 'translateX(-50%)'
+    top: `${position.y}px`
   } : {};
 
   return (
