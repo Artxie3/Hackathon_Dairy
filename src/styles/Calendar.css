@@ -180,12 +180,12 @@
 
 /* Adjust day number when there are notes */
 .calendar-day.has-calendar-notes .day-number {
-  margin-top: 2.5rem; /* Add space for note titles */
+  margin-top: 2.75rem; /* Add space for note titles */
 }
 
 /* Adjust day number when there are both events and notes */
 .calendar-day.has-hackathon-events.has-calendar-notes .day-number {
-  margin-top: 2.5rem; /* Add space for both event and note titles */
+  margin-top: 2.75rem; /* Add space for both event and note titles */
 }
 
 .dark-theme .day-number {
@@ -475,7 +475,7 @@
 /* Note Titles Display */
 .note-title {
   position: absolute;
-  top: 1.25rem;
+  top: 1.75rem;
   left: 0.25rem;
   right: 0.25rem;
   font-size: 0.5rem;
