@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Tag, AlertCircle, CheckCircle, Clock, Trash2, StickyNote, Plus } from 'lucide-react';
+import { X, Calendar, Tag, AlertCircle, CheckCircle, Clock, Trash2, StickyNote, Plus, Bell } from 'lucide-react';
 import { CalendarNote } from '../utils/supabase';
 import '../styles/Calendar.css';
 
@@ -10,6 +10,8 @@ interface CalendarNoteModalProps {
   onDelete?: (noteId: string) => Promise<void>;
   note?: CalendarNote | null;
   selectedDate?: Date;
+  notes?: CalendarNote[];
+  mode?: 'create' | 'edit' | 'list';
 }
 
 const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
@@ -18,7 +20,9 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
   onSave,
   onDelete,
   note,
-  selectedDate
+  selectedDate,
+  notes = [],
+  mode = 'create'
 }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -29,6 +33,7 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  const [editingNote, setEditingNote] = useState<CalendarNote | null>(null);
 
   useEffect(() => {
     if (note) {
@@ -60,13 +65,21 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
     setErrors([]);
 
     try {
+      // Fix date issue by using local date instead of ISO string
+      const getLocalDateString = (date: Date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+
       const noteData: Partial<CalendarNote> = {
         title: title.trim(),
         content: content.trim() || undefined,
         note_type: noteType,
         priority,
         tags,
-        note_date: selectedDate?.toISOString().split('T')[0] || note?.note_date || new Date().toISOString().split('T')[0],
+        note_date: selectedDate ? getLocalDateString(selectedDate) : note?.note_date || getLocalDateString(new Date()),
       };
 
       await onSave(noteData);
@@ -116,6 +129,42 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
     }
   };
 
+  const handleEditNote = (noteToEdit: CalendarNote) => {
+    setEditingNote(noteToEdit);
+    setTitle(noteToEdit.title);
+    setContent(noteToEdit.content || '');
+    setNoteType(noteToEdit.note_type);
+    setPriority(noteToEdit.priority);
+    setTags(noteToEdit.tags || []);
+  };
+
+  const handleAddNewNote = () => {
+    setEditingNote(null);
+    setTitle('');
+    setContent('');
+    setNoteType('note');
+    setPriority('medium');
+    setTags([]);
+  };
+
+  const getNoteIcon = (type: string) => {
+    switch (type) {
+      case 'note': return <StickyNote size={16} />;
+      case 'task': return <CheckSquare size={16} />;
+      case 'reminder': return <Bell size={16} />;
+      default: return null;
+    }
+  };
+
+  const getNoteColor = (type: string) => {
+    switch (type) {
+      case 'note': return '#3b82f6'; // Blue
+      case 'task': return '#8b5cf6'; // Purple
+      case 'reminder': return '#fbbf24'; // Mustard yellow
+      default: return '#ccc';
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -154,8 +203,79 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
           </div>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        {/* Content */}
+        <div className="p-6 space-y-4">
+          {mode === 'list' ? (
+            /* List Mode */
+            <>
+              {/* Notes List */}
+              {notes.length > 0 ? (
+                <div className="space-y-3">
+                  {notes.map(noteItem => (
+                    <div
+                      key={noteItem.id}
+                      className={`p-4 border-2 border-gray-200 dark:border-gray-700 rounded-xl cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition-all duration-200 ${
+                        noteItem.is_completed ? 'opacity-60' : ''
+                      }`}
+                      onClick={() => handleEditNote(noteItem)}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div 
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-white"
+                          style={{ backgroundColor: getNoteColor(noteItem.note_type) }}
+                        >
+                          {getNoteIcon(noteItem.note_type)}
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-gray-900 dark:text-white">
+                            {noteItem.title}
+                          </h4>
+                          {noteItem.content && (
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                              {noteItem.content}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-gray-600 dark:text-gray-400">
+                              {noteItem.note_type}
+                            </span>
+                            <span className={`text-xs px-2 py-1 rounded-full ${
+                              noteItem.priority === 'high' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
+                              noteItem.priority === 'medium' ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                              'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
+                            }`}>
+                              {noteItem.priority}
+                            </span>
+                            {noteItem.is_completed && (
+                              <span className="text-xs px-2 py-1 bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 rounded-full">
+                                Completed
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <StickyNote size={48} className="mx-auto text-gray-400 dark:text-gray-600 mb-4" />
+                  <p className="text-gray-500 dark:text-gray-400">No notes for this day.</p>
+                </div>
+              )}
+
+              {/* Add Note Button */}
+              <button
+                onClick={handleAddNewNote}
+                className="w-full py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl transition-all duration-200 font-medium shadow-lg flex items-center justify-center gap-2"
+              >
+                <Plus size={20} />
+                Add New Note
+              </button>
+            </>
+          ) : (
+            /* Create/Edit Mode */
+            <form onSubmit={handleSubmit} className="space-y-4">
           {/* Title */}
           <div className="space-y-2">
             <label htmlFor="title" className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
@@ -332,7 +452,9 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
               </button>
             </div>
           </div>
-        </form>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );
