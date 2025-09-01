@@ -46,29 +46,45 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
 
-  // Load user's entries and calendar notes
+  // Load user's entries
   useEffect(() => {
     if (!user?.username) return;
 
-    const loadData = async () => {
+    const loadEntries = async () => {
       try {
         setLoading(true);
-        const [entriesData, notesData] = await Promise.all([
-          diaryEntries.getByUser(user.username),
-          calendarNotes.getByUser(user.username)
-        ]);
+        setError(null);
+        const entriesData = await diaryEntries.getByUser(user.username);
         setEntries(entriesData);
-        setCalendarNotesList(notesData);
       } catch (err) {
-        console.error('Error loading data:', err);
-        setError('Failed to load data');
+        console.error('Error loading entries:', err);
+        setError('Failed to load diary entries');
+        setEntries([]);
       } finally {
         setLoading(false);
       }
     };
 
-    loadData();
+    loadEntries();
   }, [user?.username]);
+
+  // Load calendar notes separately
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const loadCalendarNotes = async () => {
+      try {
+        const notesData = await calendarNotes.getByUser(user.id);
+        setCalendarNotesList(notesData);
+      } catch (err) {
+        console.error('Error loading calendar notes:', err);
+        // Don't set error for calendar notes, just log it and set empty array
+        setCalendarNotesList([]);
+      }
+    };
+
+    loadCalendarNotes();
+  }, [user?.id]);
 
   // Auto-sync GitHub commits on load and periodically
   useEffect(() => {

@@ -227,7 +227,7 @@ export const calendarNotes = {
     if (error) throw error;
   },
 
-  async getByUser(userId: string) {
+  async getByUser(userId: number) {
     const { data, error } = await supabase
       .from('calendar_notes')
       .select('*')
@@ -238,7 +238,7 @@ export const calendarNotes = {
     return data;
   },
 
-  async getByDateRange(userId: string, startDate: string, endDate: string) {
+  async getByDateRange(userId: number, startDate: string, endDate: string) {
     const { data, error } = await supabase
       .from('calendar_notes')
       .select('*')
