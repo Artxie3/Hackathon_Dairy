@@ -15,6 +15,7 @@ interface DashboardStats {
   monthlyCommits: number;
   recentCommits: GitHubCommit[];
   commitActivity: { [date: string]: number };
+  codingTime: { hours: number; minutes: number };
 }
 
 interface DashboardContextType {
@@ -35,18 +36,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     monthlyCommits: 0,
     recentCommits: [],
     commitActivity: {},
+    codingTime: { hours: 0, minutes: 0 },
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-
-  // Helper function to get date range
-  const getDateRange = (days: number) => {
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(endDate.getDate() - days);
-    return { startDate, endDate };
-  };
 
   // Helper function to format date for API
   const formatDateForAPI = (date: Date) => {
@@ -74,6 +68,74 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     monthAgo.setDate(monthAgo.getDate() - 30);
     const checkDate = new Date(date);
     return checkDate >= monthAgo;
+  };
+
+  // Helper function to calculate coding time based on commit intervals
+  const calculateCodingTime = (commits: GitHubCommit[]): { hours: number; minutes: number } => {
+    if (commits.length === 0) return { hours: 0, minutes: 0 };
+
+    // Filter commits from today
+    const todayCommits = commits.filter(commit => isToday(commit.date));
+    
+    if (todayCommits.length === 0) return { hours: 0, minutes: 0 };
+
+    // Sort commits by time
+    const sortedCommits = todayCommits.sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    let totalMinutes = 0;
+    let sessionStart: Date | null = null;
+    let lastCommitTime: Date | null = null;
+
+    for (const commit of sortedCommits) {
+      const commitTime = new Date(commit.date);
+      
+      if (sessionStart === null) {
+        // First commit of the day - start a session
+        sessionStart = commitTime;
+        lastCommitTime = commitTime;
+        continue;
+      }
+
+      const timeDiff = commitTime.getTime() - lastCommitTime!.getTime();
+      const minutesDiff = timeDiff / (1000 * 60);
+
+      if (minutesDiff <= 15) {
+        // Within 15 minutes - continue the session
+        lastCommitTime = commitTime;
+      } else if (minutesDiff <= 60) {
+        // Between 15-60 minutes - count as working time
+        totalMinutes += minutesDiff;
+        lastCommitTime = commitTime;
+      } else {
+        // More than 60 minutes - end session, start new one
+        if (sessionStart && lastCommitTime) {
+          const sessionDuration = lastCommitTime.getTime() - sessionStart.getTime();
+          totalMinutes += sessionDuration / (1000 * 60);
+        }
+        sessionStart = commitTime;
+        lastCommitTime = commitTime;
+      }
+    }
+
+    // Add the last session if it's still active
+    if (sessionStart && lastCommitTime) {
+      const now = new Date();
+      const timeSinceLastCommit = now.getTime() - lastCommitTime.getTime();
+      const minutesSinceLastCommit = timeSinceLastCommit / (1000 * 60);
+      
+      if (minutesSinceLastCommit <= 60) {
+        // If last commit was within an hour, count the session
+        const sessionDuration = lastCommitTime.getTime() - sessionStart.getTime();
+        totalMinutes += sessionDuration / (1000 * 60);
+      }
+    }
+
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = Math.floor(totalMinutes % 60);
+
+    return { hours, minutes };
   };
 
   const fetchGitHubData = async () => {
@@ -139,6 +201,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       const weeklyCommits = allCommits.filter(commit => isThisWeek(commit.date)).length;
       const monthlyCommits = allCommits.filter(commit => isThisMonth(commit.date)).length;
       
+      // Calculate coding time
+      const codingTime = calculateCodingTime(allCommits);
+      
       // Take only the most recent 10 commits for display
       const recentCommits = allCommits.slice(0, 10);
 
@@ -148,6 +213,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         monthlyCommits,
         recentCommits,
         commitActivity,
+        codingTime,
       });
 
       setLastUpdated(new Date());
