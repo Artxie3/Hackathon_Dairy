@@ -42,6 +42,7 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
   const [editingNote, setEditingNote] = useState<any>(null);
   const [popupOpen, setPopupOpen] = useState(false);
   const [popupDate, setPopupDate] = useState<Date | null>(null);
+  const [popupPosition, setPopupPosition] = useState<{ x: number; y: number } | null>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
 
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -244,6 +245,11 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
 
     // If the day has notes, show popup
     if (day.hasCalendarNotes) {
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      setPopupPosition({
+        x: rect.left + rect.width / 2,
+        y: rect.bottom + 10
+      });
       setPopupDate(day.date);
       setPopupOpen(true);
     } else if (onDateClick) {
@@ -268,6 +274,7 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
     const handleClickOutside = (event: MouseEvent) => {
       if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
         setPopupOpen(false);
+        setPopupPosition(null);
       }
     };
 
@@ -488,7 +495,10 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
        {popupDate && (
          <NotesPopup
            isOpen={popupOpen}
-           onClose={() => setPopupOpen(false)}
+           onClose={() => {
+             setPopupOpen(false);
+             setPopupPosition(null);
+           }}
            notes={calendarNotes.filter(note => {
              const noteDate = new Date(note.note_date);
              return noteDate.toDateString() === popupDate.toDateString();
@@ -496,6 +506,7 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
            onEditNote={handleEditNoteFromPopup}
            onAddNote={handleAddNoteFromPopup}
            date={popupDate}
+           position={popupPosition || undefined}
          />
        )}
     </div>

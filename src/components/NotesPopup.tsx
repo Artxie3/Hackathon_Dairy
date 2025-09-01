@@ -9,6 +9,7 @@ interface NotesPopupProps {
   onEditNote: (note: CalendarNote) => void;
   onAddNote: (date: Date) => void;
   date: Date;
+  position?: { x: number; y: number };
 }
 
 const NotesPopup: React.FC<NotesPopupProps> = ({
@@ -17,7 +18,8 @@ const NotesPopup: React.FC<NotesPopupProps> = ({
   notes,
   onEditNote,
   onAddNote,
-  date
+  date,
+  position
 }) => {
   if (!isOpen) return null;
 
@@ -57,8 +59,14 @@ const NotesPopup: React.FC<NotesPopupProps> = ({
     onClose();
   };
 
+  const popupStyle = position ? {
+    left: `${position.x}px`,
+    top: `${position.y}px`,
+    transform: 'translateX(-50%)'
+  } : {};
+
   return (
-    <div className="notes-popup">
+    <div className="notes-popup" style={popupStyle}>
       {/* Header */}
       <div className="notes-popup-header">
         <h4 className="notes-popup-title">
