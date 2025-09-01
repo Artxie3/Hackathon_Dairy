@@ -323,9 +323,7 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
             }`}
                          onClick={(e) => handleDayClick(day, e)}
              onDoubleClick={() => handleAddNote(day.date)}
-            title={
-              `${day.hasEntries ? `${day.entriesCount} ${day.entriesCount === 1 ? 'entry' : 'entries'}` : ''}${day.hasEntries && day.hasHackathonEvents ? ', ' : ''}${day.hasHackathonEvents ? day.hackathonEvents.map(e => `${e.title} (${e.type})`).join(', ') : ''}${day.hasCalendarNotes ? `, ${day.calendarNotes.length} ${day.calendarNotes.length === 1 ? 'note' : 'notes'}` : ''} - ${day.date.toLocaleDateString()}\n\nDouble-click to add a note`
-            }
+
           >
                          <div className="day-number">
                {day.date.getDate()}
