@@ -7,6 +7,9 @@ import CalendarNoteModal from './CalendarNoteModal';
 interface CalendarProps {
   onDateClick?: (date: Date) => void;
   className?: string;
+  onAddNote?: (date: Date) => void;
+  onEditNote?: (note: any) => void;
+  onShowList?: (date: Date) => void;
 }
 
 interface CalendarDay {
@@ -32,14 +35,10 @@ interface CalendarDay {
   }>;
 }
 
-const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
-  const { entries, temporaryDrafts, calendarNotes, createCalendarNote, updateCalendarNote, deleteCalendarNote } = useDiary();
+const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '', onAddNote, onEditNote, onShowList }) => {
+  const { entries, temporaryDrafts, calendarNotes } = useDiary();
   const { hackathons } = useHackathons();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [editingNote, setEditingNote] = useState<any>(null);
-  const [modalMode, setModalMode] = useState<'create' | 'edit' | 'list'>('create');
   const calendarRef = useRef<HTMLDivElement>(null);
 
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -198,43 +197,19 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
 
 
   const handleAddNote = (date: Date) => {
-    setSelectedDate(date);
-    setEditingNote(null);
-    setModalMode('create');
-    setIsNoteModalOpen(true);
+    if (onAddNote) {
+      onAddNote(date);
+    }
   };
 
   const handleEditNote = (note: any, e: React.MouseEvent) => {
     e.stopPropagation();
-    setEditingNote(note);
-    setSelectedDate(new Date(note.note_date));
-    setModalMode('edit');
-    setIsNoteModalOpen(true);
-  };
-
-  const handleSaveNote = async (noteData: any) => {
-    try {
-      if (editingNote) {
-        await updateCalendarNote(editingNote.id, noteData);
-      } else {
-        await createCalendarNote(noteData);
-      }
-      // Close modal and reset state
-      setIsNoteModalOpen(false);
-      setEditingNote(null);
-      setSelectedDate(null);
-    } catch (error) {
-      console.error('Error saving note:', error);
+    if (onEditNote) {
+      onEditNote(note);
     }
   };
 
-  const handleDeleteNote = async (noteId: string) => {
-    try {
-      await deleteCalendarNote(noteId);
-    } catch (error) {
-      console.error('Error deleting note:', error);
-    }
-  };
+
 
   const handleDayClick = (day: CalendarDay, event: React.MouseEvent) => {
     // Check if clicking on a note indicator
@@ -244,10 +219,8 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
     }
 
     // If the day has notes, show modal in list mode
-    if (day.hasCalendarNotes) {
-      setSelectedDate(day.date);
-      setModalMode('list');
-      setIsNoteModalOpen(true);
+    if (day.hasCalendarNotes && onShowList) {
+      onShowList(day.date);
     } else if (onDateClick) {
       onDateClick(day.date);
     }
@@ -439,8 +412,69 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
           <span>Reminders</span>
         </div>
       </div>
+    </div>
+  );
+};
 
-      {/* Calendar Note Modal */}
+// Render modal outside of calendar container to ensure proper centering
+const CalendarWithModal: React.FC<CalendarProps> = (props) => {
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [editingNote, setEditingNote] = useState<any>(null);
+  const [modalMode, setModalMode] = useState<'create' | 'edit' | 'list'>('create');
+  const { calendarNotes, createCalendarNote, updateCalendarNote, deleteCalendarNote } = useDiary();
+
+  const handleSaveNote = async (noteData: any) => {
+    try {
+      if (editingNote) {
+        await updateCalendarNote(editingNote.id, noteData);
+      } else {
+        await createCalendarNote(noteData);
+      }
+      // Close modal and reset state
+      setIsNoteModalOpen(false);
+      setEditingNote(null);
+      setSelectedDate(null);
+      setModalMode('create');
+    } catch (error) {
+      console.error('Error saving note:', error);
+    }
+  };
+
+  const handleDeleteNote = async (noteId: string) => {
+    try {
+      await deleteCalendarNote(noteId);
+    } catch (error) {
+      console.error('Error deleting note:', error);
+    }
+  };
+
+  return (
+    <>
+      <Calendar 
+        {...props} 
+        onAddNote={(date) => {
+          setSelectedDate(date);
+          setEditingNote(null);
+          setModalMode('create');
+          setIsNoteModalOpen(true);
+        }}
+        onEditNote={(note) => {
+          setEditingNote(note);
+          // Create a proper date object to avoid timezone issues
+          const noteDate = new Date(note.note_date + 'T00:00:00');
+          setSelectedDate(noteDate);
+          setModalMode('edit');
+          setIsNoteModalOpen(true);
+        }}
+        onShowList={(date) => {
+          setSelectedDate(date);
+          setModalMode('list');
+          setIsNoteModalOpen(true);
+        }}
+      />
+      
+      {/* Calendar Note Modal - Rendered outside calendar container */}
       <CalendarNoteModal
         isOpen={isNoteModalOpen}
         onClose={() => {
@@ -460,10 +494,8 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
         mode={modalMode}
         onModeChange={setModalMode}
       />
-
-
-    </div>
+    </>
   );
 };
 
-export default Calendar; 
+export default CalendarWithModal; 

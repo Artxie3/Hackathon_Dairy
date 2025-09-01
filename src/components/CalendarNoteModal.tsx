@@ -69,9 +69,11 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
     try {
       // Fix date issue by using local date instead of ISO string
       const getLocalDateString = (date: Date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
+        // Create a new date object to avoid timezone issues
+        const localDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const year = localDate.getFullYear();
+        const month = String(localDate.getMonth() + 1).padStart(2, '0');
+        const day = String(localDate.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
       };
 
@@ -128,6 +130,21 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
       setErrors(['Failed to delete note. Please try again.']);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteNoteFromList = async (noteId: string) => {
+    if (!onDelete) return;
+
+    if (!window.confirm('Are you sure you want to delete this note? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await onDelete(noteId);
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      alert('Failed to delete note. Please try again.');
     }
   };
 
@@ -193,15 +210,15 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
               </div>
               <div>
                 <h3 className="text-xl font-bold">
-                  {mode === 'list' ? 'Notes & Tasks' : 
-                   mode === 'edit' ? 'Edit Note' : 'Create Note'}
-                </h3>
-                <p className="text-blue-100 text-sm">
                   {selectedDate?.toLocaleDateString('en-US', {
                     weekday: 'long',
                     month: 'long',
                     day: 'numeric'
                   })}
+                </h3>
+                <p className="text-blue-100 text-sm">
+                  {mode === 'list' ? 'Notes & Tasks' : 
+                   mode === 'edit' ? 'Edit Note' : 'Create Note'}
                 </p>
               </div>
             </div>
@@ -225,10 +242,9 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
                   {notes.map(noteItem => (
                     <div
                       key={noteItem.id}
-                      className={`p-4 border-2 border-gray-200 dark:border-gray-700 rounded-xl cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition-all duration-200 ${
+                      className={`p-4 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-blue-500 dark:hover:border-blue-400 transition-all duration-200 ${
                         noteItem.is_completed ? 'opacity-60' : ''
                       }`}
-                      onClick={() => handleEditNote(noteItem)}
                     >
                       <div className="flex items-start gap-3">
                         <div 
@@ -263,6 +279,28 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
                               </span>
                             )}
                           </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleEditNote(noteItem)}
+                            className="p-2 text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-all duration-200"
+                            title="Edit note"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                              <path d="m18.5 2.5 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteNoteFromList(noteItem.id);
+                            }}
+                            className="p-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
+                            title="Delete note"
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </div>
                       </div>
                     </div>
