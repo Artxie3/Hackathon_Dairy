@@ -111,7 +111,7 @@ export interface DiaryEntry {
 
 export interface CalendarNote {
   id: string;
-  user_id: string;
+  user_id: number; // This will be the user ID from the users table
   title: string;
   content?: string;
   note_date: string;

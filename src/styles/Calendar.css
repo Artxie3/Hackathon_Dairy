@@ -196,13 +196,13 @@
 
 /* Today */
 .calendar-day.today {
-  background: rgba(99, 102, 241, 0.05);
-  border: 2px solid var(--color-primary);
+  background: rgba(128, 128, 128, 0.1);
+  border: 2px solid #808080;
   border-radius: 0.375rem;
 }
 
 .calendar-day.today .day-number {
-  color: var(--color-primary);
+  color: #808080;
   font-weight: 700;
 }
 
@@ -280,8 +280,8 @@
 }
 
 .legend-dot {
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -291,7 +291,7 @@
 }
 
 .legend-dot.today {
-  background: var(--color-primary);
+  background: #808080; /* Gray */
 }
 
 /* Days with Hackathon Events */
@@ -380,15 +380,15 @@
 }
 
 .legend-dot.hackathon-start {
-  background: #06b6d4;
+  background: #87ceeb; /* Light blue */
 }
 
 .legend-dot.hackathon-end {
-  background: #ef4444;
+  background: #ef4444; /* Red */
 }
 
 .legend-dot.hackathon-deadline {
-  background: #f59e0b;
+  background: #ff00ff; /* Fuchsia */
 }
 
 /* Add Note Button */
@@ -442,7 +442,7 @@
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 8px;
+  font-size: 10px;
   color: white;
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
@@ -453,15 +453,15 @@
 }
 
 .note-indicator.note {
-  background: #3b82f6;
+  background: #3b82f6; /* Blue */
 }
 
 .note-indicator.task {
-  background: #10b981;
+  background: #10b981; /* Green */
 }
 
 .note-indicator.reminder {
-  background: #f59e0b;
+  background: #ff00ff; /* Fuchsia - same as deadline */
 }
 
 .note-indicator.low {

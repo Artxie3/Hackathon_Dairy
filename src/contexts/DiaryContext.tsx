@@ -138,11 +138,11 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
   };
 
   const createCalendarNote = async (note: Partial<CalendarNote>) => {
-    if (!user?.username) throw new Error('User not authenticated');
+    if (!user?.id) throw new Error('User not authenticated');
 
     const newNote = await calendarNotes.create({
       ...note,
-      user_id: user.username,
+      user_id: user.id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
