@@ -119,41 +119,46 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-[280px] max-w-[90vw] max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-[400px] max-w-[95vw] max-h-[90vh] overflow-hidden border border-gray-200/20 dark:border-gray-700/30">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {note ? 'Edit Note' : 'Add Note'}
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-          >
-            <X size={20} />
-          </button>
+        <div className="relative bg-gradient-to-r from-blue-500 to-purple-600 p-6 text-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                {note ? (
+                  <StickyNote size={20} className="text-white" />
+                ) : (
+                  <Plus size={20} className="text-white" />
+                )}
+              </div>
+              <div>
+                <h3 className="text-xl font-bold">
+                  {note ? 'Edit Note' : 'Create Note'}
+                </h3>
+                <p className="text-blue-100 text-sm">
+                  {selectedDate?.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-lg flex items-center justify-center transition-all duration-200"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Date Display */}
-          {selectedDate && (
-            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-              <Calendar size={16} />
-              <span>
-                {selectedDate.toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
-              </span>
-            </div>
-          )}
-
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {/* Title */}
-          <div>
-            <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <div className="space-y-2">
+            <label htmlFor="title" className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
               Title *
             </label>
             <input
@@ -161,79 +166,82 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              placeholder="Enter note title..."
+              className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white transition-all duration-200 text-lg font-medium"
+              placeholder="What's this note about?"
               required
             />
           </div>
 
           {/* Content */}
-          <div>
-            <label htmlFor="content" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <div className="space-y-2">
+            <label htmlFor="content" className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
               Content
             </label>
             <textarea
               id="content"
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              placeholder="Enter note content..."
+              rows={4}
+              className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white transition-all duration-200 resize-none"
+              placeholder="Add details, thoughts, or reminders..."
             />
           </div>
 
-          {/* Note Type */}
-          <div>
-            <label htmlFor="noteType" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Type
-            </label>
-            <select
-              id="noteType"
-              value={noteType}
-              onChange={(e) => setNoteType(e.target.value as 'note' | 'task' | 'reminder')}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-            >
-              <option value="note">Note</option>
-              <option value="task">Task</option>
-              <option value="reminder">Reminder</option>
-            </select>
-          </div>
+          {/* Type and Priority Row */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Note Type */}
+            <div className="space-y-2">
+              <label htmlFor="noteType" className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Type
+              </label>
+              <select
+                id="noteType"
+                value={noteType}
+                onChange={(e) => setNoteType(e.target.value as 'note' | 'task' | 'reminder')}
+                className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white transition-all duration-200 font-medium"
+              >
+                <option value="note">📝 Note</option>
+                <option value="task">✅ Task</option>
+                <option value="reminder">🔔 Reminder</option>
+              </select>
+            </div>
 
-          {/* Priority */}
-          <div>
-            <label htmlFor="priority" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Priority
-            </label>
-            <select
-              id="priority"
-              value={priority}
-              onChange={(e) => setPriority(e.target.value as 'low' | 'medium' | 'high')}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
+            {/* Priority */}
+            <div className="space-y-2">
+              <label htmlFor="priority" className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Priority
+              </label>
+              <select
+                id="priority"
+                value={priority}
+                onChange={(e) => setPriority(e.target.value as 'low' | 'medium' | 'high')}
+                className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white transition-all duration-200 font-medium"
+              >
+                <option value="low">🟢 Low</option>
+                <option value="medium">🟡 Medium</option>
+                <option value="high">🔴 High</option>
+              </select>
+            </div>
           </div>
 
           {/* Tags */}
-          <div>
-            <label htmlFor="tags" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <div className="space-y-3">
+            <label htmlFor="tags" className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
               Tags
             </label>
-            <div className="flex gap-2 mb-2">
+            <div className="flex gap-2">
               <input
                 type="text"
                 value={newTag}
                 onChange={(e) => setNewTag(e.target.value)}
                 onKeyPress={handleKeyPress}
-                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                className="flex-1 px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white transition-all duration-200"
                 placeholder="Add a tag..."
               />
               <button
                 type="button"
                 onClick={addTag}
-                className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-200 font-medium shadow-lg"
               >
                 Add
               </button>
@@ -243,16 +251,16 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
                 {tags.map(tag => (
                   <span
                     key={tag}
-                    className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full text-sm"
+                    className="inline-flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-sm font-medium border border-blue-200 dark:border-blue-700"
                   >
-                    <Tag size={12} />
+                    <Tag size={14} />
                     {tag}
                     <button
                       type="button"
                       onClick={() => removeTag(tag)}
-                      className="ml-1 text-blue-500 hover:text-blue-700 dark:hover:text-blue-200"
+                      className="text-blue-500 hover:text-red-500 dark:hover:text-red-400 transition-colors"
                     >
-                      <X size={12} />
+                      <X size={14} />
                     </button>
                   </span>
                 ))}
@@ -262,9 +270,9 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
 
           {/* Errors */}
           {errors.length > 0 && (
-            <div className="text-red-600 dark:text-red-400 text-sm">
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
               {errors.map((error, index) => (
-                <div key={index} className="flex items-center gap-2">
+                <div key={index} className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm font-medium">
                   <AlertCircle size={16} />
                   {error}
                 </div>
@@ -273,14 +281,14 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
           )}
 
           {/* Actions */}
-          <div className="flex justify-between pt-4">
+          <div className="flex justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
             {/* Delete button (only for existing notes) */}
             {note && onDelete && (
               <button
                 type="button"
                 onClick={handleDelete}
                 disabled={isDeleting || isSaving}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium shadow-lg"
               >
                 {isDeleting ? (
                   <>
@@ -301,14 +309,14 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                className="px-6 py-3 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all duration-200 font-medium"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSaving || isDeleting}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium shadow-lg"
               >
                 {isSaving ? (
                   <>
@@ -318,7 +326,7 @@ const CalendarNoteModal: React.FC<CalendarNoteModalProps> = ({
                 ) : (
                   <>
                     <CheckCircle size={16} />
-                    {note ? 'Update' : 'Save'}
+                    {note ? 'Update Note' : 'Create Note'}
                   </>
                 )}
               </button>

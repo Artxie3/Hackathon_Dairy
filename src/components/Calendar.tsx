@@ -251,7 +251,7 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
       const bottomY = rect.bottom + 10;
       
       // Ensure popup stays within viewport
-      const popupWidth = 280;
+      const popupWidth = 320;
       const viewportWidth = window.innerWidth;
       const adjustedX = Math.max(popupWidth / 2, Math.min(centerX, viewportWidth - popupWidth / 2));
       
