@@ -331,7 +331,7 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
              
                            {/* Event titles */}
               {day.hasHackathonEvents && (
-                <div className="event-title" title={day.hackathonEvents.map(e => `${e.title} (${e.type})`).join(', ')}>
+                <div className="event-title">
                   {day.hackathonEvents.length === 1 
                     ? day.hackathonEvents[0].title 
                     : `${day.hackathonEvents[0].title} +${day.hackathonEvents.length - 1}`
@@ -347,7 +347,7 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
                     day.calendarNotes[0].priority === 'medium' ? 'note-title-medium' :
                     'note-title-low'
                   }`}
-                  title={day.calendarNotes.map(n => `${n.title} (${n.type})`).join(', ')}
+
                 >
                   {day.calendarNotes.length === 1 
                     ? day.calendarNotes[0].title 
@@ -381,7 +381,7 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
                     key={i} 
                     className={`hackathon-dot ${event.type}`}
                     style={{ backgroundColor: event.color }}
-                    title={`${event.title} - ${event.type}`}
+
                   />
                 ))}
                 {day.hackathonEvents.length > 3 && (
@@ -397,7 +397,7 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
                   <div 
                     key={i} 
                     className={`note-indicator ${note.type} ${note.priority} ${note.isCompleted ? 'completed' : ''}`}
-                    title={`${note.title} (${note.type}, ${note.priority} priority)${note.isCompleted ? ' - Completed' : ''}`}
+
                     onClick={(e) => handleEditNote(note, e)}
                   >
                     {note.type === 'note' && <StickyNote size={12} />}
