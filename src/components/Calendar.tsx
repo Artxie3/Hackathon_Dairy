@@ -138,7 +138,9 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
     
     // Map calendar notes by date
     calendarNotes.forEach(note => {
-      const noteDate = new Date(note.note_date);
+      // Parse the date string directly to avoid timezone issues
+      const [year, month, day] = note.note_date.split('-').map(Number);
+      const noteDate = new Date(year, month - 1, day); // month is 0-indexed
       const dateKey = noteDate.toDateString();
       if (!calendarNotesMap.has(dateKey)) {
         calendarNotesMap.set(dateKey, []);
@@ -207,7 +209,10 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
   const handleEditNote = (note: any, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingNote(note);
-    setSelectedDate(new Date(note.note_date));
+    // Parse the date string directly to avoid timezone issues
+    const [year, month, day] = note.note_date.split('-').map(Number);
+    const noteDate = new Date(year, month - 1, day); // month is 0-indexed
+    setSelectedDate(noteDate);
     setModalMode('edit');
     setIsNoteModalOpen(true);
   };
@@ -453,10 +458,12 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
         onDelete={handleDeleteNote}
         note={editingNote}
         selectedDate={selectedDate || undefined}
-        notes={selectedDate ? calendarNotes.filter(note => {
-          const noteDate = new Date(note.note_date);
-          return noteDate.toDateString() === selectedDate.toDateString();
-        }) : []}
+                 notes={selectedDate ? calendarNotes.filter(note => {
+           // Parse the date string directly to avoid timezone issues
+           const [year, month, day] = note.note_date.split('-').map(Number);
+           const noteDate = new Date(year, month - 1, day); // month is 0-indexed
+           return noteDate.toDateString() === selectedDate.toDateString();
+         }) : []}
         mode={modalMode}
         onModeChange={setModalMode}
       />
