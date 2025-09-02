@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, StickyNote, CheckSquare, Bell } from 'lucide
 import { useDiary } from '../contexts/DiaryContext';
 import { useHackathons } from '../contexts/HackathonContext';
 import CalendarNoteModal from './CalendarNoteModal';
+import HackathonModal from './HackathonModal';
 
 interface CalendarProps {
   onDateClick?: (date: Date) => void;
@@ -37,6 +38,7 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
   const { hackathons } = useHackathons();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+  const [isHackathonModalOpen, setIsHackathonModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [editingNote, setEditingNote] = useState<any>(null);
   const [modalMode, setModalMode] = useState<'create' | 'edit' | 'list'>('create');
@@ -248,12 +250,19 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
       return; // Let the note indicator handle the click
     }
 
-    // If the day has notes, show modal in list mode
+    // If the day has notes, show notes modal in list mode
     if (day.hasCalendarNotes) {
       setSelectedDate(day.date);
       setModalMode('list');
       setIsNoteModalOpen(true);
-    } else if (onDateClick) {
+    }
+    // If the day has hackathon events, show hackathon modal
+    else if (day.hasHackathonEvents) {
+      setSelectedDate(day.date);
+      setIsHackathonModalOpen(true);
+    }
+    // Otherwise, call the onDateClick callback
+    else if (onDateClick) {
       onDateClick(day.date);
     }
   };
@@ -315,7 +324,15 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
             } ${
               day.isToday ? 'today' : ''
             } ${
-              (day.hasEntries || day.hasHackathonEvents) ? 'has-entries' : ''
+              day.hasEntries ? 'has-entries' : ''
+            } ${
+              day.hasHackathonEvents ? 'has-hackathon-events' : ''
+            } ${
+              day.hasHackathonEvents && day.hackathonEvents.some(e => e.type === 'start') ? 'has-hackathon-start' : ''
+            } ${
+              day.hasHackathonEvents && day.hackathonEvents.some(e => e.type === 'end') ? 'has-hackathon-end' : ''
+            } ${
+              day.hasHackathonEvents && day.hackathonEvents.some(e => e.type === 'deadline') ? 'has-hackathon-deadline' : ''
             } ${
               day.isWeekend ? 'weekend' : ''
             }`}
@@ -327,11 +344,26 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
                {day.date.getDate()}
              </div>
              
-             
+                           {/* Event titles */}
+              {day.hasHackathonEvents && (
+                <div className="event-title">
+                  {day.hackathonEvents.length === 1 
+                    ? day.hackathonEvents[0].title 
+                    : `${day.hackathonEvents[0].title} +${day.hackathonEvents.length - 1}`
+                  }
+                </div>
+              )}
 
-              {/* Note titles - only show for high priority notes */}
-              {day.hasCalendarNotes && day.calendarNotes[0].priority === 'high' && (
-                <div className="note-title note-title-high">
+              {/* Note titles */}
+              {day.hasCalendarNotes && (
+                <div 
+                  className={`note-title ${
+                    day.calendarNotes[0].priority === 'high' ? 'note-title-high' :
+                    day.calendarNotes[0].priority === 'medium' ? 'note-title-medium' :
+                    'note-title-low'
+                  }`}
+
+                >
                   {day.calendarNotes.length === 1 
                     ? day.calendarNotes[0].title 
                     : `${day.calendarNotes[0].title} +${day.calendarNotes.length - 1}`
@@ -339,38 +371,37 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
                 </div>
               )}
             
-            {/* Entry indicators - unified for both diary entries and hackathons */}
-            {(day.hasEntries || day.hasHackathonEvents) && (
+            {/* Entry indicators */}
+            {day.hasEntries && (
               <div className="entry-indicators">
-                {(() => {
-                  const totalItems = day.entriesCount + day.hackathonEvents.length;
-                  if (totalItems <= 3) {
-                    // Show individual dots for 1-3 items
-                    const dots = [];
-                    // Add diary entry dots
-                    for (let i = 0; i < day.entriesCount; i++) {
-                      dots.push(<div key={`entry-${i}`} className="entry-dot" />);
-                    }
-                    // Add hackathon dots
-                    for (let i = 0; i < day.hackathonEvents.length; i++) {
-                      dots.push(
-                        <div 
-                          key={`hackathon-${i}`} 
-                          className="entry-dot hackathon-dot"
-                          style={{ backgroundColor: day.hackathonEvents[i].color }}
-                        />
-                      );
-                    }
-                    return dots;
-                  } else {
-                    // Show count for 4+ items
-                    return (
-                      <div className="entry-count">
-                        {totalItems}
-                      </div>
-                    );
-                  }
-                })()}
+                {day.entriesCount <= 3 ? (
+                  // Show individual dots for 1-3 entries
+                  Array.from({ length: day.entriesCount }).map((_, i) => (
+                    <div key={i} className="entry-dot" />
+                  ))
+                ) : (
+                  // Show count for 4+ entries
+                  <div className="entry-count">
+                    {day.entriesCount}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Hackathon event indicators */}
+            {day.hasHackathonEvents && (
+              <div className="hackathon-indicators">
+                {day.hackathonEvents.slice(0, 3).map((event, i) => (
+                  <div 
+                    key={i} 
+                    className={`hackathon-dot ${event.type}`}
+                    style={{ backgroundColor: event.color }}
+
+                  />
+                ))}
+                {day.hackathonEvents.length > 3 && (
+                  <div className="hackathon-more">+{day.hackathonEvents.length - 3}</div>
+                )}
               </div>
             )}
 
@@ -409,8 +440,16 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
           <span>Today</span>
         </div>
         <div className="legend-item">
-          <div className="legend-dot has-entries" style={{ backgroundColor: '#22c55e' }}></div>
-          <span>Hackathons & Events</span>
+          <div className="legend-dot hackathon-start" style={{ backgroundColor: '#87ceeb' }}></div>
+          <span>Hackathon starts</span>
+        </div>
+        <div className="legend-item">
+          <div className="legend-dot hackathon-deadline" style={{ backgroundColor: '#ff00ff' }}></div>
+          <span>Submission deadline</span>
+        </div>
+        <div className="legend-item">
+          <div className="legend-dot hackathon-end" style={{ backgroundColor: '#ef4444' }}></div>
+          <span>Hackathon ends</span>
         </div>
         <div className="legend-item">
           <div className="legend-dot note-indicator note medium" style={{ backgroundColor: '#3b82f6' }}></div>
@@ -449,6 +488,65 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
         onModeChange={setModalMode}
       />
 
+      <HackathonModal
+        isOpen={isHackathonModalOpen}
+        onClose={() => {
+          setIsHackathonModalOpen(false);
+          setSelectedDate(null);
+        }}
+        selectedDate={selectedDate || new Date()}
+        hackathons={selectedDate ? hackathons.filter(hackathon => {
+          const startDate = new Date(hackathon.startDate);
+          const endDate = new Date(hackathon.endDate);
+          const deadlineDate = new Date(hackathon.submissionDeadline);
+          const selectedDateStr = selectedDate.toDateString();
+          
+          return startDate.toDateString() === selectedDateStr ||
+                 endDate.toDateString() === selectedDateStr ||
+                 deadlineDate.toDateString() === selectedDateStr;
+        }).map(hackathon => {
+          const startDate = new Date(hackathon.startDate);
+          const endDate = new Date(hackathon.endDate);
+          const deadlineDate = new Date(hackathon.submissionDeadline);
+          const selectedDateStr = selectedDate.toDateString();
+          
+          const events = [];
+          if (startDate.toDateString() === selectedDateStr) {
+            events.push({
+              id: `${hackathon.id}-start`,
+              title: hackathon.title,
+              type: 'start' as const,
+              date: hackathon.startDate,
+              description: hackathon.description,
+              url: hackathon.devpostUrl,
+              platform: hackathon.organizer
+            });
+          }
+          if (endDate.toDateString() === selectedDateStr) {
+            events.push({
+              id: `${hackathon.id}-end`,
+              title: hackathon.title,
+              type: 'end' as const,
+              date: hackathon.endDate,
+              description: hackathon.description,
+              url: hackathon.devpostUrl,
+              platform: hackathon.organizer
+            });
+          }
+          if (deadlineDate.toDateString() === selectedDateStr) {
+            events.push({
+              id: `${hackathon.id}-deadline`,
+              title: hackathon.title,
+              type: 'deadline' as const,
+              date: hackathon.submissionDeadline,
+              description: hackathon.description,
+              url: hackathon.devpostUrl,
+              platform: hackathon.organizer
+            });
+          }
+          return events;
+        }).flat() : []}
+      />
 
     </div>
   );
