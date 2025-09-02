@@ -344,9 +344,9 @@ const Calendar: React.FC<CalendarProps> = ({ onDateClick, className = '' }) => {
                {day.date.getDate()}
              </div>
              
-                           {/* Event titles */}
+                           {/* Hackathon titles */}
               {day.hasHackathonEvents && (
-                <div className="event-title">
+                <div className="hackathon-title">
                   {day.hackathonEvents.length === 1 
                     ? day.hackathonEvents[0].title 
                     : `${day.hackathonEvents[0].title} +${day.hackathonEvents.length - 1}`
