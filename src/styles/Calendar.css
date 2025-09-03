@@ -350,7 +350,7 @@
 /* Hackathon Event Indicators */
 .hackathon-indicators {
   position: absolute;
-  bottom: 1.5rem;
+  bottom: 0.25rem;
   left: 0.25rem;
   display: flex;
   gap: 0.125rem;
