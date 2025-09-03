@@ -338,7 +338,7 @@
 /* Hackathon Deadline - Fuchsia */
 .calendar-day.has-hackathon-deadline {
   background: rgba(245, 101, 101, 0.05);
-  border-left: 3px solid #f59e0b;
+  border-left: 3px solid #ff00ff;
 }
 
 .dark-theme .calendar-day.has-hackathon-deadline {
