@@ -475,16 +475,16 @@
 }
 
 .event-title:hover {
-  background: var(--color-gray-100);
+  background: rgba(0, 0, 0, 0.9);
   transform: scale(1.02);
 }
 
 .dark-theme .event-title {
-  background: var(--color-gray-100);
+  background: rgba(0, 0, 0, 0.8);
 }
 
 .dark-theme .event-title:hover {
-  background: var(--color-gray-100);
+  background: rgba(0, 0, 0, 0.95);
 }
 
 /* Note Titles Display */
