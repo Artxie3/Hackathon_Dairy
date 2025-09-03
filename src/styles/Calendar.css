@@ -175,7 +175,7 @@
 
 /* Adjust day number when there are events */
 .calendar-day.has-hackathon-events .day-number {
-  margin-top: 2.75rem; /* Add space for event titles */
+  margin-top: 1.5rem; /* Add space for event titles */
 }
 
 /* Adjust day number when there are notes */
@@ -454,9 +454,10 @@
 }
 
 /* Event Titles Display */
+/*
 .event-title {
   position: absolute;
-  top: 1.5rem;   /* ← Mover debajo del número del día */
+  top: 0.25rem;
   left: 0.25rem;
   right: 0.25rem;
   font-size: 0.625rem;
@@ -473,6 +474,7 @@
   cursor: pointer;
   transition: all 0.2s ease;
 }
+*/
 
 .event-title:hover {
   background: rgba(0, 0, 0, 0.9);
