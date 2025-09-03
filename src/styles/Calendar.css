@@ -175,7 +175,7 @@
 
 /* Adjust day number when there are events */
 .calendar-day.has-hackathon-events .day-number {
-  margin-top: 2.5rem; /* Add space for event titles */
+  margin-top: 2.75rem; /* ← Cambiar de 1.5rem a 2.75rem para dar espacio al event-title */
 }
 
 /* Adjust day number when there are notes */
@@ -456,7 +456,7 @@
 /* Event Titles Display */
 .event-title {
   position: absolute;
-  top: 1.5rem;   /* ← Mover debajo del número del día */
+  top: 1.75rem;  /* ← Cambiar de 1.5rem a 1.75rem para estar al mismo nivel que las notas */
   left: 0.25rem;
   right: 0.25rem;
   font-size: 0.625rem;
@@ -469,7 +469,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   z-index: 2;
-  max-width: calc(100% - 0.5rem);
+  max-width: calc(100% - 2rem);  /* ← Cambiar de 0.5rem a 2rem para dejar espacio para iconos */
   cursor: pointer;
   transition: all 0.2s ease;
 }
