@@ -479,16 +479,16 @@
 }
 
 .event-title:hover {
-  background: rgba(0, 0, 0, 0.9);
+  background: transparent;
   transform: scale(1.02);
 }
 
 .dark-theme .event-title {
-  background: rgba(0, 0, 0, 0.8);
+  background: transparent;
 }
 
 .dark-theme .event-title:hover {
-  background: rgba(0, 0, 0, 0.95);
+  background: transparent;
 }
 
 /* Note Titles Display */
