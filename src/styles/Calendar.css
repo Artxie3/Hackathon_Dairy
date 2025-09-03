@@ -702,7 +702,7 @@
   }
 
   .calendar-day.has-hackathon-events .day-number {
-    margin-top: 1rem;
+    margin-top: 0.25rem;
   }
 
   .calendar-day.has-calendar-notes .day-number {
