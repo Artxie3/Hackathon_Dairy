@@ -475,12 +475,12 @@
 }
 
 .event-title:hover {
-  background: rgba(0, 0, 0, 0.9);
+  background: var(--color-gray-100);
   transform: scale(1.02);
 }
 
 .dark-theme .event-title {
-  background: rgba(0, 0, 0, 0.8);
+  background: var(--color-gray-100);
 }
 
 .dark-theme .event-title:hover {
