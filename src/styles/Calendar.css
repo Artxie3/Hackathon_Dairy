@@ -171,11 +171,13 @@
   color: var(--color-gray-900);
   margin-bottom: 0.25rem;
   line-height: 1;
+  position: relative;
+  z-index: 3; /* por encima de event-title */
 }
 
 /* Adjust day number when there are events */
 .calendar-day.has-hackathon-events .day-number {
-  margin-top: 1.5rem; /* Add space for event titles */
+  margin-top: 0; /* no empujar el número cuando hay evento */
 }
 
 /* Adjust day number when there are notes */
@@ -457,7 +459,7 @@
 
 .event-title {
   position: absolute;
-  top: 1.75rem;
+  top: 1.75rem; /* se mostrará debajo del número */
   left: 0.25rem;
   right: 0.25rem;
   font-size: 0.625rem;
