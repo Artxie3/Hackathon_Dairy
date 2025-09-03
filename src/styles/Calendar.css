@@ -175,7 +175,7 @@
 
 /* Adjust day number when there are events */
 .calendar-day.has-hackathon-events .day-number {
-  margin-top: 3.5rem; /* Add space for event titles */
+  margin-top: 1.5rem; /* Add space for event titles */
 }
 
 /* Adjust day number when there are notes */
