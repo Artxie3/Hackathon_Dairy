@@ -456,13 +456,13 @@
 /* Event Titles Display */
 .event-title {
   position: absolute;
-  top: 0.25rem;
+  top: 1.5rem;   /* ← Mover debajo del número del día */
   left: 0.25rem;
   right: 0.25rem;
   font-size: 0.625rem;
   font-weight: 600;
   color: white;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--color-gray-100);
   padding: 0.125rem 0.25rem;
   border-radius: 0.25rem;
   white-space: nowrap;
